@@ -43,6 +43,13 @@ cmake_minimum_required (VERSION 3.9.0)
 # Name of your project
 project (myProject)
 
+# Add necessary compiler flags
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR 
+   CMAKE_CXX_COMPILER_ID MATCHES "AppleClang" OR
+   CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+	add_compile_options(-fno-rtti)
+endif()
+
 # Make sure to use the C++14 standard
 set(CMAKE_CXX_STANDARD 14)
 
@@ -107,7 +114,7 @@ Your build files will be output to the `build` folder.
  
 ## Copy files {#build_a_g}
 Before you can run the application you must first copy the data files and dynamic libraries so that your application can find them when it starts. 
- - Copy the `bin/Data` folder to the location where is your executable located
+ - Copy the `bin/Data` folder to the location where is your executable is located
  - If on Windows you should also copy any .dll files in the `bin` folder to where your executable is located. Note that precompiled binaries package comes with separate set of dynamic libraries for Debug and Release builds in `bin/Debug` and `bin/Release` folders. You should copy them to the appropriate folder depending on the configuration you are building with. 
  
 For example in Visual Studio the executable will be placed at `x64/Release/` within your project root, for a 64-bit Release configuration. This is where you should place the dynamic libraries and the data files.
