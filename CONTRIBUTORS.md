@@ -9,16 +9,25 @@ Huge thanks to all the patrons, contributors and donators!
 
 # Tier X Patrons
 - John Lagerquist [Founder]
- 
-# Tier 3 Patrons
+- Andreas Schüle [Founder]
 - Christian Clavet [Founder]
+- jeaninde [Founder]
+
+# Tier 3 Patrons
 
 # Tier 2 Patrons
-- Andreas Schüle [Founder]
+- Andrzej Oraniewicz [Founder]
+- Nemerle [Founder]
 
 # Tier 1 Patrons
 - Danijel Ribić [Founder]
 - Serar Tok [Founder]
+- Akaoray [Founder]
+- Thomas Tang [Founder]
+- Nekith [Founder]
+- Summer Softleigh [Founder]
 
 # One-time donators
 - Žan Strahija [Founder]
+- Michael Jones [Founder]
+- Patrick Meyer [Founder]

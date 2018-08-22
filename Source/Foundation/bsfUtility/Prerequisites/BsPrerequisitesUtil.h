@@ -251,9 +251,33 @@
 #if BS_COMPILER == BS_COMPILER_CLANG
 	/** @ref scriptBindingMacro */
 	#define BS_SCRIPT_EXPORT(...) __attribute__((annotate("se," #__VA_ARGS__)))
+
+	/** 
+	 * When applied to a parameter, makes it a variable argument parameter in the scripting interface (if supported
+	 * by the scripting language.
+	 */
+	#define BS_PARAMS __attribute__((annotate("params")))
+
+	/** 
+	 * When applied to a parameter or a field of ResourceHandle type, makes that element be exported as a raw resource in
+	 * script code.
+	 */
+	#define BS_NORREF __attribute__((annotate("norref")))
 #else
 	/** @ref scriptBindingMacro */
 	#define BS_SCRIPT_EXPORT(...)
+
+	/** 
+	 * When applied to a parameter, makes it a variable argument parameter in the scripting interface (if supported
+	 * by the scripting language.
+	 */
+	#define BS_PARAMS
+
+	/** 
+	 * When applied to a parameter or a field of ResourceHandle type, makes that element be exported as a raw resource in
+	 * script code.
+	 */
+	#define BS_NORREF
 #endif
 
 // Short-hand names for various built-in types
@@ -261,8 +285,8 @@
 
 #include "Allocators/BsMemoryAllocator.h"
 
-// Useful threading defines
-#include "Threading/BsThreadDefines.h"
+// Common threading functionality
+#include "Threading/BsThreading.h"
 
 // Commonly used standard headers
 #include "Prerequisites/BsStdHeaders.h"

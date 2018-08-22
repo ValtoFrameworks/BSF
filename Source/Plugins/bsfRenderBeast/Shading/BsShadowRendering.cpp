@@ -11,6 +11,7 @@
 #include "Utility/BsBitwise.h"
 #include "RenderAPI/BsVertexDataDesc.h"
 #include "Renderer/BsRenderer.h"
+#include "BsRendererRenderable.h"
 
 namespace bs { namespace ct
 {
@@ -447,14 +448,14 @@ namespace bs { namespace ct
 			Command()
 			{ }
 
-			Command(BeastRenderableElement* element)
+			Command(RenderableElement* element)
 				:element(element), isElement(true)
 			{ }
 
 			union
 			{
-				BeastRenderableElement* element;
-				RendererObject* renderable;
+				RenderableElement* element;
+				RendererRenderable* renderable;
 			};
 
 
@@ -485,7 +486,7 @@ namespace bs { namespace ct
 					Command renderableCommand;
 					renderableCommand.mask = 0;
 
-					RendererObject* renderable = sceneInfo.renderables[i];
+					RendererRenderable* renderable = sceneInfo.renderables[i];
 					renderableCommand.isElement = false;
 					renderableCommand.renderable = renderable;
 
@@ -522,7 +523,7 @@ namespace bs { namespace ct
 					{
 						if (command.isElement)
 						{
-							const BeastRenderableElement& element = *command.element;
+							const RenderableElement& element = *command.element;
 
 							if (element.morphVertexDeclaration == nullptr)
 								gRendererUtility().draw(element.mesh, element.subMesh);
@@ -571,7 +572,7 @@ namespace bs { namespace ct
 
 		void bindRenderable(ShadowRenderQueue::Command& command) const
 		{
-			RendererObject* renderable = command.renderable;
+			RendererRenderable* renderable = command.renderable;
 
 			for (UINT32 j = 0; j < 6; j++)
 				gShadowCubeMasksDef.gFaceMasks.set(shadowCubeMasksBuffer, (command.mask & (1 << j)), j);
@@ -614,7 +615,7 @@ namespace bs { namespace ct
 
 		void bindRenderable(ShadowRenderQueue::Command& command) const
 		{
-			RendererObject* renderable = command.renderable;
+			RendererRenderable* renderable = command.renderable;
 
 			material->setPerObjectBuffer(renderable->perObjectParamBuffer);
 		}
@@ -651,7 +652,7 @@ namespace bs { namespace ct
 
 		void bindRenderable(ShadowRenderQueue::Command& command) const
 		{
-			RendererObject* renderable = command.renderable;
+			RendererRenderable* renderable = command.renderable;
 
 			material->setPerObjectBuffer(renderable->perObjectParamBuffer);
 		}
@@ -688,7 +689,7 @@ namespace bs { namespace ct
 
 		void bindRenderable(ShadowRenderQueue::Command& command) const
 		{
-			RendererObject* renderable = command.renderable;
+			RendererRenderable* renderable = command.renderable;
 
 			material->setPerObjectBuffer(renderable->perObjectParamBuffer);
 		}
@@ -1020,6 +1021,8 @@ namespace bs { namespace ct
 
 		SPtr<GpuParamBlockBuffer> perViewBuffer = view.getPerViewBuffer();
 
+		ProfileGPUBlock sampleBlock("Render shadow occlusion");
+
 		RenderAPI& rapi = RenderAPI::instance();
 		const RenderAPIInfo& rapiInfo = rapi.getAPIInfo();
 		// TODO - Calculate and set a scissor rectangle for the light
@@ -1270,6 +1273,8 @@ namespace bs { namespace ct
 		Quaternion lightRotation(BsIdentity);
 		lightRotation.lookRotation(lightDir, Vector3::UNIT_Y);
 
+		ProfileGPUBlock profileSample("Project directional light shadow");
+
 		for (UINT32 i = 0; i < numCascades; ++i)
 		{
 			Sphere frustumBounds;
@@ -1386,6 +1391,8 @@ namespace bs { namespace ct
 		mapInfo.updateNormArea(MAX_ATLAS_SIZE);
 		ShadowMapAtlas& atlas = mDynamicShadowMaps[mapInfo.textureIdx];
 
+		ProfileGPUBlock profileSample("Project spot light shadows");
+
 		RenderAPI& rapi = RenderAPI::instance();
 		rapi.setRenderTarget(atlas.getTarget());
 		rapi.setViewport(mapInfo.normArea);
@@ -1399,8 +1406,7 @@ namespace bs { namespace ct
 		mapInfo.depthBias = getDepthBias(*light, light->getBounds().getRadius(), mapInfo.depthRange, options.mapSize);
 		mapInfo.subjectBounds = light->getBounds();
 
-		Quaternion lightRotation(BsIdentity);
-		lightRotation.lookRotation(-light->getTransform().getRotation().zAxis());
+		Quaternion lightRotation = light->getTransform().getRotation();
 
 		Matrix4 view = Matrix4::view(rendererLight.getShiftedLightPosition(), lightRotation);
 		Matrix4 proj = Matrix4::projectionPerspective(light->getSpotAngle(), 1.0f, 0.05f, light->getAttenuationRadius());
@@ -1416,7 +1422,7 @@ namespace bs { namespace ct
 		gShadowParamsDef.gNDCZToDeviceZ.set(shadowParamsBuffer, RendererView::getNDCZToDeviceZ());
 
 		const Vector<Plane>& frustumPlanes = localFrustum.getPlanes();
-		Matrix4 worldMatrix = view.transpose();
+		Matrix4 worldMatrix = view.inverseAffine();
 
 		Vector<Plane> worldPlanes(frustumPlanes.size());
 		UINT32 j = 0;
@@ -1494,6 +1500,8 @@ namespace bs { namespace ct
 		// Note: Projecting on positive Z axis, because cubemaps use a left-handed coordinate system
 		Matrix4 proj = Matrix4::projectionPerspective(Degree(90.0f), 1.0f, 0.05f, light->getAttenuationRadius(), true);
 		ConvexVolume localFrustum(proj);
+
+		ProfileGPUBlock profileSample("Project radial light shadows");
 
 		RenderAPI& rapi = RenderAPI::instance();
 		const RenderAPIInfo& rapiInfo = rapi.getAPIInfo();
@@ -1591,7 +1599,7 @@ namespace bs { namespace ct
 				frustums[i] = frustum;
 
 				// Register far plane of all frustums
-				boundingPlanes.push_back(worldPlanes.back());
+				boundingPlanes.push_back(worldPlanes[FRUSTUM_PLANE_FAR]);
 				gShadowCubeMatricesDef.gFaceVPMatrices.set(shadowCubeMatricesBuffer, shadowViewProj, i);
 			}
 			else
@@ -1686,7 +1694,7 @@ namespace bs { namespace ct
 				maxMapSize = std::max(maxMapSize, optimalMapSize);
 
 				// Determine if the shadow should fade out
-				float fadePercent = Math::lerp01(optimalMapSize, (float)MIN_SHADOW_MAP_SIZE, (float)SHADOW_MAP_FADE_SIZE);
+				float fadePercent = Math::invLerp(optimalMapSize, (float)MIN_SHADOW_MAP_SIZE, (float)SHADOW_MAP_FADE_SIZE);
 				fadePercents.push_back(fadePercent);
 				maxFadePercent = std::max(maxFadePercent, fadePercent);
 			}
@@ -1944,7 +1952,7 @@ namespace bs { namespace ct
 
 	float ShadowRendering::getDepthBias(const Light& light, float radius, float depthRange, UINT32 mapSize)
 	{
-		const static float RADIAL_LIGHT_BIAS = 0.0005f;
+		const static float RADIAL_LIGHT_BIAS = 0.005f;
 		const static float SPOT_DEPTH_BIAS = 0.01f;
 		const static float DIR_DEPTH_BIAS = 0.001f; // In clip space units
 		const static float DEFAULT_RESOLUTION = 512.0f;

@@ -3,7 +3,7 @@
 #include "GUI/BsGUIButtonBase.h"
 #include "2D/BsImageSprite.h"
 #include "GUI/BsGUISkin.h"
-#include "2D/BsSpriteTexture.h"
+#include "Image/BsSpriteTexture.h"
 #include "2D/BsTextSprite.h"
 #include "GUI/BsGUIDimensions.h"
 #include "GUI/BsGUIMouseEvent.h"
@@ -394,7 +394,7 @@ namespace bs
 
 	String GUIButtonBase::_getTooltip() const
 	{
-		return mContent.getTooltip();
+		return mContent.tooltip;
 	}
 
 	void GUIButtonBase::refreshContentSprite()
@@ -418,7 +418,7 @@ namespace bs
 	TEXT_SPRITE_DESC GUIButtonBase::getTextDesc() const
 	{
 		TEXT_SPRITE_DESC textDesc;
-		textDesc.text = mContent.getText();
+		textDesc.text = mContent.text;
 		textDesc.font = _getStyle()->font;
 		textDesc.fontSize = _getStyle()->fontSize;
 		textDesc.color = getTint() * getActiveTextColor();

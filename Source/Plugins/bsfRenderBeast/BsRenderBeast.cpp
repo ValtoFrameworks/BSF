@@ -24,7 +24,7 @@
 #include "Renderer/BsCamera.h"
 #include "Renderer/BsRendererUtility.h"
 #include "Utility/BsRendererTextures.h"
-#include "Utility/BsGpuResourcePool.h"
+#include "Renderer/BsGpuResourcePool.h"
 #include "Renderer/BsRendererManager.h"
 #include "Shading/BsShadowRendering.h"
 #include "Shading/BsStandardDeferred.h"
@@ -32,6 +32,7 @@
 #include "BsRenderBeastOptions.h"
 #include "BsRenderBeastIBLUtility.h"
 #include "BsRenderCompositor.h"
+#include "Shading/BsGpuParticleSimulation.h"
 
 using namespace std::placeholders;
 
@@ -76,6 +77,9 @@ namespace bs { namespace ct
 			mFeatureSet = RenderBeastFeatureSet::DesktopMacOS;
 		}
 
+		// Ensure profiler methods can be called from start-up methods
+		gProfilerGPU().beginFrame();
+
 		RendererUtility::startUp();
 		GpuResourcePool::startUp();
 		IBLUtility::startUp<RenderBeastIBLUtility>();
@@ -87,6 +91,10 @@ namespace bs { namespace ct
 		mMainViewGroup = bs_new<RendererViewGroup>();
 
 		StandardDeferred::startUp();
+		ParticleRenderer::startUp();
+		GpuParticleSimulation::startUp();
+
+		gProfilerGPU().endFrame();
 
 		RenderCompositor::registerNodeType<RCNodeSceneDepth>();
 		RenderCompositor::registerNodeType<RCNodeGBuffer>();
@@ -118,6 +126,8 @@ namespace bs { namespace ct
 
 		RenderCompositor::cleanUp();
 
+		GpuParticleSimulation::shutDown();
+		ParticleRenderer::shutDown();
 		StandardDeferred::shutDown();
 
 		bs_delete(mMainViewGroup);
@@ -213,6 +223,21 @@ namespace bs { namespace ct
 		mScene->unregisterSkybox(skybox);
 	}
 
+	void RenderBeast::notifyParticleSystemAdded(ParticleSystem* particleSystem)
+	{
+		mScene->registerParticleSystem(particleSystem);
+	}
+
+	void RenderBeast::notifyParticleSystemUpdated(ParticleSystem* particleSystem, bool tfrmOnly)
+	{
+		mScene->updateParticleSystem(particleSystem, tfrmOnly);
+	}
+
+	void RenderBeast::notifyParticleSystemRemoved(ParticleSystem* particleSystem)
+	{
+		mScene->unregisterParticleSystem(particleSystem);
+	}
+
 	void RenderBeast::setOptions(const SPtr<RendererOptions>& options)
 	{
 		mOptions = std::static_pointer_cast<RenderBeastOptions>(options);
@@ -290,7 +315,7 @@ namespace bs { namespace ct
 		gCoreThread().queueCommand(setShaderOverride);
 	}
 
-	void RenderBeast::renderAll(const EvaluatedAnimationData* animData) 
+	void RenderBeast::renderAll(PerFrameData perFrameData) 
 	{
 		// Sync all dirty sim thread CoreObject data to core thread
 		CoreObjectManager::instance().syncToCore();
@@ -306,10 +331,10 @@ namespace bs { namespace ct
 		timings.timeDelta = gTime().getFrameDelta();
 		timings.frameIdx = gTime().getFrameIdx();
 		
-		gCoreThread().queueCommand(std::bind(&RenderBeast::renderAllCore, this, timings, animData));
+		gCoreThread().queueCommand(std::bind(&RenderBeast::renderAllCore, this, timings, perFrameData));
 	}
 
-	void RenderBeast::renderAllCore(FrameTimings timings, const EvaluatedAnimationData* animData)
+	void RenderBeast::renderAllCore(FrameTimings timings, PerFrameData perFrameData)
 	{
 		THROW_IF_NOT_CORE_THREAD;
 
@@ -326,17 +351,31 @@ namespace bs { namespace ct
 		// Update global per-frame hardware buffers
 		mScene->setParamFrameParams(timings.time);
 
-		// Retrieve animation data
+		// Simulate particles
+		GpuParticleSimulation::instance().simulate(perFrameData.particles, timings.timeDelta);
+
+		// Update bounds for all particle systems
+		if(perFrameData.particles)
+			mScene->updateParticleSystemBounds(perFrameData.particles);
+
 		sceneInfo.renderableReady.resize(sceneInfo.renderables.size(), false);
 		sceneInfo.renderableReady.assign(sceneInfo.renderables.size(), false);
 		
-		FrameInfo frameInfo(timings, animData);
+		FrameInfo frameInfo(timings, perFrameData);
 
 		// Make sure any renderer tasks finish first, as rendering might depend on them
 		processTasks(false);
 
-		// Update reflection probe array if required
+		// If any reflection probes were updated or added, we need to copy them over in the global reflection probe array
 		updateReflProbeArray();
+
+		// Update material animation times for all renderables
+		for (UINT32 i = 0; i < sceneInfo.renderables.size(); i++)
+		{
+			RendererRenderable* renderable = sceneInfo.renderables[i];
+			for (auto& element : renderable->elements)
+				element.materialAnimationTime += timings.timeDelta;
+		}
 
 		// Gather all views
 		for (auto& rtInfo : sceneInfo.renderTargets)
@@ -722,7 +761,7 @@ namespace bs { namespace ct
 		RendererViewGroup viewGroup(viewPtrs, 6, mCoreOptions->shadowMapSize);
 		viewGroup.determineVisibility(sceneInfo);
 
-		FrameInfo frameInfo({ 0.0f, 1.0f / 60.0f, 0 });
+		FrameInfo frameInfo({ 0.0f, 1.0f / 60.0f, 0 }, PerFrameData());
 		renderViews(viewGroup, frameInfo);
 
 		// Make sure the render texture is available for reads

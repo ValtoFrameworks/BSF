@@ -23,13 +23,13 @@ namespace bs
 		 * Enable this option if you want pointer events to pass through this element by default. This will allow elements
 		 * underneath this element to receive pointer events.
 		 */
-		ClickThrough,
+		ClickThrough = 0x01,
 
 		/** 
 		 * Enable this option if the element accepts keyboard/gamepad input focus. This will allow the element to be
 		 * navigated to using keys/buttons. 
 		 */
-		AcceptsKeyFocus
+		AcceptsKeyFocus = 0x02
 	};
 
 	typedef Flags<GUIElementOption> GUIElementOptions;
@@ -60,8 +60,14 @@ namespace bs
 		GUIElement(String styleName, const GUIDimensions& dimensions, GUIElementOptions options = GUIElementOptions(0));
 		virtual ~GUIElement() = default;
 
-		/**	Sets or removes focus from an element. Will change element style. */
-		void setFocus(bool enabled);
+		/**	
+		 * Change the GUI element focus state. 
+		 * 
+		 * @param[in]	enabled		Give the element focus or take it away.
+		 * @param[in]	clear		If true the focus will be cleared from any elements currently in focus. Otherwise
+		 *							the element will just be appended to the in-focus list (if enabling focus).
+		 */
+		void setFocus(bool enabled, bool clear = false);
 
 		/**	Sets the tint of the GUI element. */
 		virtual void setTint(const Color& color);

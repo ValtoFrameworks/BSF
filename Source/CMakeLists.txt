@@ -2,9 +2,9 @@
 set (BS_FRAMEWORK_VERSION_MAJOR 1)
 set (BS_FRAMEWORK_VERSION_MINOR 0)
 
-set (BS_FRAMEWORK_PREBUILT_DEPENDENCIES_VERSION 4)
+set (BS_FRAMEWORK_PREBUILT_DEPENDENCIES_VERSION 7)
 set (BS_FRAMEWORK_SRC_DEPENDENCIES_VERSION 1)
-set (BS_FRAMEWORK_BUILTIN_ASSETS_VERSION 4)
+set (BS_FRAMEWORK_BUILTIN_ASSETS_VERSION 5)
 
 # Options
 set(AUDIO_MODULE "OpenAudio" CACHE STRING "Audio backend to use.")
@@ -32,6 +32,13 @@ set(INCLUDE_ALL_IN_WORKFLOW OFF CACHE BOOL "If true, all libraries (even those n
 set(BUILD_TESTS OFF CACHE BOOL "If true, build targets for running unit tests will be included in the output.")
 
 set(BUILD_BSL OFF CACHE BOOL "If true, build lexer & parser for BSL. Requires flex & bison dependencies.")
+
+set(ENABLE_COTIRE false CACHE BOOL "Enable cotire's precompiled headers and unity build support (experimental).")
+
+# Add cotire if enabled
+if(ENABLE_COTIRE)
+	include(${BSF_SOURCE_DIR}/CMake/cotire.cmake)
+endif()
 
 # Ensure dependencies are up to date
 ## Check prebuilt dependencies that are downloaded in a .zip
@@ -82,6 +89,10 @@ set(PHYSICS_MODULE_LIB bsfPhysX)
 configure_file("${BSF_SOURCE_DIR}/CMake/BsEngineConfig.h.in" "${BSF_SOURCE_DIR}/Foundation/bsfEngine/BsEngineConfig.h")
 configure_file("${BSF_SOURCE_DIR}/CMake/BsFrameworkConfig.h.in" "${BSF_SOURCE_DIR}/Foundation/bsfUtility/BsFrameworkConfig.h")
 
+# Set files disallowed in precompiled headers
+set_directory_properties(PROPERTIES
+    COTIRE_PREFIX_HEADER_IGNORE_PATH "${CMAKE_CURRENT_SOURCE_DIR}")
+
 # Sub-directories
 ## Foundation
 add_subdirectory(Foundation)
@@ -130,10 +141,17 @@ if(BUILD_TESTS)
 	target_include_directories(UtilityTest PRIVATE 
 		"Foundation/bsfUtility"
 		"Foundation/bsfUtility/ThirdParty")
+
+	add_executable(CoreTest 
+		Foundation/bsfCore/Private/UnitTests/BsCoreTest.cpp)
+		
+	target_link_libraries(CoreTest bsf)
 	
 	set_property(TARGET UtilityTest PROPERTY FOLDER Tests)
-
-	add_test(NAME FrameworkTests COMMAND $<TARGET_FILE:UtilityTest>)
+	set_property(TARGET CoreTest PROPERTY FOLDER Tests)	
+	
+	add_test(NAME UtilityTests COMMAND $<TARGET_FILE:UtilityTest>)
+	add_test(NAME CoreTests COMMAND $<TARGET_FILE:UtilityTest>)
 endif()
 
 ## Install

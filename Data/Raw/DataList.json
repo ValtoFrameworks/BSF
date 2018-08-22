@@ -167,6 +167,18 @@
         {
             "Path": "PerFrameData.bslinc",
             "UUID": "64225149-43b6-698e-809e-43b647d8d09d"
+        },
+        {
+            "Path": "ParticleVertex.bslinc",
+            "UUID": "c830bfdf-4e45-56a3-46b2-4e4598d3b312"
+        },
+        {
+            "Path": "RadixSortCommon.bslinc",
+            "UUID": "944603e9-4407-32cb-69a8-44078adaeceb"
+        },
+        {
+            "Path": "GpuParticleTileVertex.bslinc",
+            "UUID": "a6943ff6-4123-4bbc-d397-4123245a6cae"
         }
     ],
     "Shaders": [
@@ -253,10 +265,6 @@
         {
             "Path": "Transparent.bsl",
             "UUID": "10db2029-145c-424e-8399-2be48aa66680"
-        },
-        {
-            "Path": "FlatFramebufferToTexture.bsl",
-            "UUID": "c469c67d-6a43-4961-8e8c-d769f88546b7"
         },
         {
             "Path": "ReflectionCubeDownsample.bsl",
@@ -425,6 +433,46 @@
         {
             "Path": "ShadowDepthNormalNoPS.bsl",
             "UUID": "5335edda-c14c-0158-d73e-f880d58d0596"
+        },
+        {
+            "Path": "ParticlesUnlit.bsl",
+            "UUID": "cf6ba550-40b3-6e4e-55ab-40b3abd077f1"
+        },
+        {
+            "Path": "RadixSortCount.bsl",
+            "UUID": "63499594-43a3-71da-64bf-43a3a5efe7ac"
+        },
+        {
+            "Path": "RadixSortPrefixScan.bsl",
+            "UUID": "6c0c0b72-4e01-6863-fa8d-4e01a4df8046"
+        },
+        {
+            "Path": "RadixSortReorder.bsl",
+            "UUID": "0dd1ac91-402a-9e2e-2ba1-402a77f5efda"
+        },
+        {
+            "Path": "ClearLoadStore.bsl",
+            "UUID": "1e87bcc7-4477-7234-1482-4477d48e52d4"
+        },
+        {
+            "Path": "TextureArrayToMSAATexture.bsl",
+            "UUID": "a99d5d8d-4daa-3ced-a99b-4daa6fe91297"
+        },
+        {
+            "Path": "GpuParticleClear.bsl",
+            "UUID": "75174c83-4231-d406-ffbe-423122141e61"
+        },
+        {
+            "Path": "GpuParticleInject.bsl",
+            "UUID": "d9df7b26-4eec-3e02-2f8c-4eec7782b461"
+        },
+        {
+            "Path": "GpuParticleSimulate.bsl",
+            "UUID": "95e03c75-4b53-ec71-4686-4b53d4367cd4"
+        },
+        {
+            "Path": "GpuParticleBounds.bsl",
+            "UUID": "ba7c69fd-4b9b-3fc4-888a-4b9b29180376"
         }
     ],
     "Skin": [

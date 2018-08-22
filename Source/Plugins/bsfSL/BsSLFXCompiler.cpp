@@ -113,7 +113,7 @@ namespace bs
 
 		static void printMultiLineString(StringStream& output, const std::string& str, const std::string& indent)
 		{
-			// Determine at which position the actual text begins (excluding the "error (X:Y) : " or the like) 
+			// Determine at which position the actual text begins (excluding the "error (X:Y) : " or the like)
 			auto textStartPos = str.find(" : ");
 			if (textStartPos != std::string::npos)
 				textStartPos += 3;
@@ -256,10 +256,10 @@ namespace bs
 		case Xsc::Reflection::DataType::Int2:
 			return GPDT_INT2;
 		case Xsc::Reflection::DataType::UInt3:
-		case Xsc::Reflection::DataType::Int3: 
+		case Xsc::Reflection::DataType::Int3:
 			return GPDT_INT3;
 		case Xsc::Reflection::DataType::UInt4:
-		case Xsc::Reflection::DataType::Int4: 
+		case Xsc::Reflection::DataType::Int4:
 			return GPDT_INT4;
 		case Xsc::Reflection::DataType::Float2x2: return GPDT_MATRIX_2X2;
 		case Xsc::Reflection::DataType::Float2x3: return GPDT_MATRIX_2X3;
@@ -348,64 +348,64 @@ namespace bs
 
 		switch (sampState.filter)
 		{
-		case Xsc::Reflection::Filter::MinMagMipPoint: 
-		case Xsc::Reflection::Filter::ComparisonMinMagMipPoint: 
+		case Xsc::Reflection::Filter::MinMagMipPoint:
+		case Xsc::Reflection::Filter::ComparisonMinMagMipPoint:
 			desc.minFilter = FO_POINT;
 			desc.magFilter = FO_POINT;
 			desc.mipFilter = FO_POINT;
 			break;
-		case Xsc::Reflection::Filter::MinMagPointMipLinear: 
-		case Xsc::Reflection::Filter::ComparisonMinMagPointMipLinear: 
+		case Xsc::Reflection::Filter::MinMagPointMipLinear:
+		case Xsc::Reflection::Filter::ComparisonMinMagPointMipLinear:
 			desc.minFilter = FO_POINT;
 			desc.magFilter = FO_POINT;
 			desc.mipFilter = FO_LINEAR;
 			break;
-		case Xsc::Reflection::Filter::MinPointMagLinearMipPoint: 
-		case Xsc::Reflection::Filter::ComparisonMinPointMagLinearMipPoint: 
+		case Xsc::Reflection::Filter::MinPointMagLinearMipPoint:
+		case Xsc::Reflection::Filter::ComparisonMinPointMagLinearMipPoint:
 			desc.minFilter = FO_POINT;
 			desc.magFilter = FO_LINEAR;
 			desc.mipFilter = FO_POINT;
 			break;
-		case Xsc::Reflection::Filter::MinPointMagMipLinear: 
-		case Xsc::Reflection::Filter::ComparisonMinPointMagMipLinear: 
+		case Xsc::Reflection::Filter::MinPointMagMipLinear:
+		case Xsc::Reflection::Filter::ComparisonMinPointMagMipLinear:
 			desc.minFilter = FO_POINT;
 			desc.magFilter = FO_LINEAR;
 			desc.mipFilter = FO_LINEAR;
 			break;
-		case Xsc::Reflection::Filter::MinLinearMagMipPoint: 
-		case Xsc::Reflection::Filter::ComparisonMinLinearMagMipPoint: 
+		case Xsc::Reflection::Filter::MinLinearMagMipPoint:
+		case Xsc::Reflection::Filter::ComparisonMinLinearMagMipPoint:
 			desc.minFilter = FO_LINEAR;
 			desc.magFilter = FO_POINT;
 			desc.mipFilter = FO_POINT;
 			break;
-		case Xsc::Reflection::Filter::MinLinearMagPointMipLinear: 
-		case Xsc::Reflection::Filter::ComparisonMinLinearMagPointMipLinear: 
+		case Xsc::Reflection::Filter::MinLinearMagPointMipLinear:
+		case Xsc::Reflection::Filter::ComparisonMinLinearMagPointMipLinear:
 			desc.minFilter = FO_LINEAR;
 			desc.magFilter = FO_POINT;
 			desc.mipFilter = FO_LINEAR;
 			break;
-		case Xsc::Reflection::Filter::MinMagLinearMipPoint: 
-		case Xsc::Reflection::Filter::ComparisonMinMagLinearMipPoint: 
+		case Xsc::Reflection::Filter::MinMagLinearMipPoint:
+		case Xsc::Reflection::Filter::ComparisonMinMagLinearMipPoint:
 			desc.minFilter = FO_LINEAR;
 			desc.magFilter = FO_LINEAR;
 			desc.mipFilter = FO_POINT;
 			break;
-		case Xsc::Reflection::Filter::MinMagMipLinear: 
-		case Xsc::Reflection::Filter::ComparisonMinMagMipLinear: 
+		case Xsc::Reflection::Filter::MinMagMipLinear:
+		case Xsc::Reflection::Filter::ComparisonMinMagMipLinear:
 			desc.minFilter = FO_LINEAR;
 			desc.magFilter = FO_LINEAR;
 			desc.mipFilter = FO_LINEAR;
 			break;
-		case Xsc::Reflection::Filter::Anisotropic: 
-		case Xsc::Reflection::Filter::ComparisonAnisotropic: 
+		case Xsc::Reflection::Filter::Anisotropic:
+		case Xsc::Reflection::Filter::ComparisonAnisotropic:
 			desc.minFilter = FO_ANISOTROPIC;
 			desc.magFilter = FO_ANISOTROPIC;
-			desc.minFilter = FO_ANISOTROPIC;
+			desc.mipFilter = FO_ANISOTROPIC;
 			break;
-		default: 
+		default:
 			break;
 		}
-		
+
 		return SamplerState::create(desc);
 	}
 
@@ -420,7 +420,7 @@ namespace bs
 			switch(entry.type)
 			{
 			case Xsc::Reflection::UniformType::UniformBuffer:
-				desc.setParamBlockAttribs(entry.ident.c_str(), false, GPBU_STATIC);
+				desc.setParamBlockAttribs(entry.ident.c_str(), false, GBU_STATIC);
 				break;
 			case Xsc::Reflection::UniformType::Buffer:
 				{
@@ -433,11 +433,12 @@ namespace bs
 							continue;
 
 						if (entry.defaultValue == -1)
-							desc.addParameter(ident, ident, objType);
+							desc.addParameter(SHADER_OBJECT_PARAM_DESC(ident, ident, objType));
 						else
 						{
 							const Xsc::Reflection::DefaultValue& defVal = reflData.defaultValues[entry.defaultValue];
-							desc.addParameter(ident, ident, objType, getBuiltinTexture(defVal.integer));
+							desc.addParameter(SHADER_OBJECT_PARAM_DESC(ident, ident, objType),
+								getBuiltinTexture(defVal.integer));
 						}
 					}
 					else
@@ -448,11 +449,11 @@ namespace bs
 							continue;
 
 						objType = ReflTypeToBufferType((Xsc::Reflection::BufferType)entry.baseType);
-						desc.addParameter(ident, ident, objType);
+						desc.addParameter(SHADER_OBJECT_PARAM_DESC(ident, ident, objType));
 					}
 				}
 				break;
-			case Xsc::Reflection::UniformType::Sampler: 
+			case Xsc::Reflection::UniformType::Sampler:
 			{
 				auto findIter = reflData.samplerStates.find(entry.ident);
 				if (findIter != reflData.samplerStates.end())
@@ -467,26 +468,26 @@ namespace bs
 					if(findIter->second.isNonDefault)
 					{
 						SPtr<SamplerState> defaultVal = parseSamplerState(findIter->second);
-						desc.addParameter(ident, ident, GPOT_SAMPLER2D, defaultVal);
+						desc.addParameter(SHADER_OBJECT_PARAM_DESC(ident, ident, GPOT_SAMPLER2D), defaultVal);
 
 						if (!alias.empty())
-							desc.addParameter(ident, alias, GPOT_SAMPLER2D, defaultVal);
+							desc.addParameter(SHADER_OBJECT_PARAM_DESC(ident, alias, GPOT_SAMPLER2D), defaultVal);
 					}
 					else
 					{
-						desc.addParameter(ident, ident, GPOT_SAMPLER2D);
+						desc.addParameter(SHADER_OBJECT_PARAM_DESC(ident, ident, GPOT_SAMPLER2D));
 
 						if (!alias.empty())
-							desc.addParameter(ident, alias, GPOT_SAMPLER2D);
+							desc.addParameter(SHADER_OBJECT_PARAM_DESC(ident, alias, GPOT_SAMPLER2D));
 					}
 				}
 				else
 				{
-					desc.addParameter(ident, ident, GPOT_SAMPLER2D);
+					desc.addParameter(SHADER_OBJECT_PARAM_DESC(ident, ident, GPOT_SAMPLER2D));
 				}
 				break;
 			}
-			case Xsc::Reflection::UniformType::Variable: 
+			case Xsc::Reflection::UniformType::Variable:
 			{
 				bool isBlockInternal = false;
 				if(entry.uniformBlock != -1)
@@ -512,12 +513,23 @@ namespace bs
 					}
 
 					if (entry.defaultValue == -1)
-						desc.addParameter(ident, ident, type);
+						desc.addParameter(SHADER_DATA_PARAM_DESC(ident, ident, type));
 					else
 					{
 						const Xsc::Reflection::DefaultValue& defVal = reflData.defaultValues[entry.defaultValue];
 
-						desc.addParameter(ident, ident, type, StringID::NONE, 1, 0, (UINT8*)defVal.matrix);
+						desc.addParameter(SHADER_DATA_PARAM_DESC(ident, ident, type, StringID::NONE, 1, 0), 
+							(UINT8*)defVal.matrix);
+					}
+
+					if(!entry.spriteUVRef.empty() && (type == GPDT_FLOAT4))
+					{
+						SHADER_PARAM_ATTRIBUTE attribute;
+						attribute.value.assign(entry.spriteUVRef.data(), entry.spriteUVRef.size());
+						attribute.nextParamIdx = (UINT32)-1;
+						attribute.type = ShaderParamAttributeType::SpriteUV;
+
+						desc.setParameterAttribute(ident, attribute);
 					}
 				}
 			}
@@ -537,7 +549,7 @@ namespace bs
 		VKSL45
 	};
 
-	String crossCompile(const String& hlsl, GpuProgramType type, CrossCompileOutput outputType, bool optionalEntry, 
+	String crossCompile(const String& hlsl, GpuProgramType type, CrossCompileOutput outputType, bool optionalEntry,
 		UINT32& startBindingSlot, SHADER_DESC* shaderDesc = nullptr, Vector<GpuProgramType>* detectedTypes = nullptr)
 	{
 		SPtr<StringStream> input = bs_shared_ptr_new<StringStream>();
@@ -601,13 +613,13 @@ namespace bs
 
 		switch(outputType)
 		{
-		case CrossCompileOutput::GLSL45: 
+		case CrossCompileOutput::GLSL45:
 			outputDesc.shaderVersion = Xsc::OutputShaderVersion::GLSL450;
 			break;
-		case CrossCompileOutput::GLSL41: 
+		case CrossCompileOutput::GLSL41:
 			outputDesc.shaderVersion = Xsc::OutputShaderVersion::GLSL410;
 			break;
-		case CrossCompileOutput::VKSL45: 
+		case CrossCompileOutput::VKSL45:
 			outputDesc.shaderVersion = Xsc::OutputShaderVersion::VKSL450;
 			break;
 		}
@@ -701,13 +713,13 @@ namespace bs
 		crossCompile(hlsl, GPT_VERTEX_PROGRAM, CrossCompileOutput::GLSL45, true, dummy, &shaderDesc, &entryPoints);
 	}
 
-	BSLFXCompileResult BSLFXCompiler::compile(const String& name, const String& source, 
+	BSLFXCompileResult BSLFXCompiler::compile(const String& name, const String& source,
 		const UnorderedMap<String, String>& defines)
 	{
 		// Parse global shader options & shader meta-data
 		SHADER_DESC shaderDesc;
 		Vector<String> includes;
-		
+
 		BSLFXCompileResult output = compileShader(source, defines, shaderDesc, includes);
 
 		// Generate a shader from the parsed information
@@ -824,7 +836,7 @@ namespace bs
 	}
 
 	BSLFXCompileResult BSLFXCompiler::parseMetaDataAndOptions(ASTFXNode* rootNode,
-		Vector<std::pair<ASTFXNode*, ShaderMetaData>>& shaderMetaData, 
+		Vector<std::pair<ASTFXNode*, ShaderMetaData>>& shaderMetaData,
 		Vector<SubShaderData>& subShaderData, SHADER_DESC& shaderDesc)
 	{
 		BSLFXCompileResult output;
@@ -1364,7 +1376,7 @@ namespace bs
 
 		return !isDefault;
 	}
-	
+
 	void BSLFXCompiler::parseCodeBlock(ASTFXNode* codeNode, const Vector<String>& codeBlocks, PassData& passData)
 	{
 		if (codeNode == nullptr || (codeNode->type != NT_Code))
@@ -1381,14 +1393,7 @@ namespace bs
 
 		if (index != (UINT32)-1 && index < (UINT32)codeBlocks.size())
 		{
-			switch (codeNode->type)
-			{
-			case NT_Code:
-				passData.code += codeBlocks[index];
-				break;
-			default:
-				break;
-			}
+			passData.code += codeBlocks[index];
 		}
 	}
 
@@ -1466,7 +1471,7 @@ namespace bs
 
 				nextPassIdx = std::max(nextPassIdx, passIdx) + 1;
 				passData->code = combinedCommonPassData.code + passData->code;
-				
+
 				ASTFXNode* passNode = option->value.nodePtr;
 				parsePass(passNode, codeBlocks, *passData);
 			}
@@ -1610,7 +1615,7 @@ namespace bs
 				{
 					auto& entry = shaderMetaData[baseIdx];
 
-					// Was already parsed previously, don't parse it multiple times (happens when multiple mixins 
+					// Was already parsed previously, don't parse it multiple times (happens when multiple mixins
 					// include the same mixin)
 					if (mixinWasParsed[baseIdx])
 						continue;
@@ -1656,7 +1661,7 @@ namespace bs
 	}
 
 	BSLFXCompileResult BSLFXCompiler::compileTechniques(
-		const Vector<std::pair<ASTFXNode*, ShaderMetaData>>& shaderMetaData, const String& source, 
+		const Vector<std::pair<ASTFXNode*, ShaderMetaData>>& shaderMetaData, const String& source,
 		const UnorderedMap<String, String>& defines, SHADER_DESC& shaderDesc, Vector<String>& includes)
 	{
 		BSLFXCompileResult output;
@@ -1772,7 +1777,7 @@ namespace bs
 						rawCode = rawCode->next;
 					}
 
-					output = compileTechniques(variationParseState, entry.second.name, codeBlocks, variation, includeSet, 
+					output = compileTechniques(variationParseState, entry.second.name, codeBlocks, variation, includeSet,
 						shaderDesc);
 
 					if (!output.errorMessage.empty())
@@ -1840,7 +1845,7 @@ namespace bs
 		return output;
 	}
 
-	BSLFXCompileResult BSLFXCompiler::compileShader(String source, const UnorderedMap<String, String>& defines, 
+	BSLFXCompileResult BSLFXCompiler::compileShader(String source, const UnorderedMap<String, String>& defines,
 		SHADER_DESC& shaderDesc, Vector<String>& includes)
 	{
 		SPtr<ct::Renderer> renderer = RendererManager::instance().getActive();
@@ -1921,7 +1926,7 @@ namespace bs
 
 				SHADER_DESC subShaderDesc;
 				Vector<String> subShaderIncludes;
-				BSLFXCompileResult subShaderOutput = compileShader(subShaderSource.str(), subShaderDefines, subShaderDesc, 
+				BSLFXCompileResult subShaderOutput = compileShader(subShaderSource.str(), subShaderDefines, subShaderDesc,
 					subShaderIncludes);
 
 				if (!subShaderOutput.errorMessage.empty())
@@ -1943,8 +1948,8 @@ namespace bs
 		return output;
 	}
 
-	BSLFXCompileResult BSLFXCompiler::compileTechniques(ParseState* parseState, const String& name, 
-		const Vector<String>& codeBlocks, const ShaderVariation& variation, UnorderedSet<String>& includes, 
+	BSLFXCompileResult BSLFXCompiler::compileTechniques(ParseState* parseState, const String& name,
+		const Vector<String>& codeBlocks, const ShaderVariation& variation, UnorderedSet<String>& includes,
 		SHADER_DESC& shaderDesc)
 	{
 		BSLFXCompileResult output;
@@ -1987,7 +1992,7 @@ namespace bs
 		}
 
 		bool* mixinWasParsed = bs_stack_alloc<bool>((UINT32)shaderData.size());
-		std::function<bool(const ShaderMetaData&, ShaderData&)> parseInherited = 
+		std::function<bool(const ShaderMetaData&, ShaderData&)> parseInherited =
 			[&](const ShaderMetaData& metaData, ShaderData& outShader)
 		{
 			for (auto riter = metaData.includes.rbegin(); riter != metaData.includes.rend(); ++riter)
@@ -2003,8 +2008,8 @@ namespace bs
 
 					if (entry.second.metaData.name == includes)
 					{
-						bool matches = 
-							(entry.second.metaData.language == metaData.language || 
+						bool matches =
+							(entry.second.metaData.language == metaData.language ||
 							entry.second.metaData.language == "Any");
 
 						// We want the last matching mixin, in order to allow mixins to override each other
@@ -2017,7 +2022,7 @@ namespace bs
 				{
 					auto& entry = shaderData[baseIdx];
 
-					// Was already parsed previously, don't parse it multiple times (happens when multiple mixins 
+					// Was already parsed previously, don't parse it multiple times (happens when multiple mixins
 					// include the same mixin)
 					if (mixinWasParsed[baseIdx])
 						continue;
@@ -2027,7 +2032,7 @@ namespace bs
 
 					parseShader(entry.first, codeBlocks, outShader);
 					mixinWasParsed[baseIdx] = true;
-					
+
 				}
 				else
 				{
@@ -2106,12 +2111,12 @@ namespace bs
 				PassData& glslPassData = glslTechnique.passes[j];
 				PassData& vkslPassData = vkslTechnique.passes[j];
 
-				// Clean non-standard HLSL 
+				// Clean non-standard HLSL
 				// Note: Ideally we add a full HLSL output module to XShaderCompiler, instead of using simple regex. This
 				// way the syntax could be enhanced with more complex features, while still being able to output pure
 				// HLSL.
 				static const std::regex attrRegex(
-					R"(\[\s*layout\s*\(.*\)\s*\]|\[\s*internal\s*\]|\[\s*color\s*\]|\[\s*alias\s*\(.*\)\s*\])");
+					R"(\[\s*layout\s*\(.*\)\s*\]|\[\s*internal\s*\]|\[\s*color\s*\]|\[\s*alias\s*\(.*\)\s*\]|\[\s*spriteuv\s*\(.*\)\s*\])");
 				hlslPassData.code = regex_replace(hlslPassData.code, attrRegex, "");
 
 				static const std::regex initializerRegex(
@@ -2138,44 +2143,44 @@ namespace bs
 					{
 					case GPT_VERTEX_PROGRAM:
 						hlslPassData.vertexCode = hlslPassData.code;
-						glslPassData.vertexCode = HLSLtoGLSL(glslPassData.code, GPT_VERTEX_PROGRAM, 
+						glslPassData.vertexCode = HLSLtoGLSL(glslPassData.code, GPT_VERTEX_PROGRAM,
 							glslVersion, glslBinding);
-						vkslPassData.vertexCode = HLSLtoGLSL(glslPassData.code, GPT_VERTEX_PROGRAM, 
+						vkslPassData.vertexCode = HLSLtoGLSL(glslPassData.code, GPT_VERTEX_PROGRAM,
 							CrossCompileOutput::VKSL45, vkslBinding);
 						break;
 					case GPT_FRAGMENT_PROGRAM:
 						hlslPassData.fragmentCode = hlslPassData.code;
-						glslPassData.fragmentCode = HLSLtoGLSL(glslPassData.code, GPT_FRAGMENT_PROGRAM, 
+						glslPassData.fragmentCode = HLSLtoGLSL(glslPassData.code, GPT_FRAGMENT_PROGRAM,
 							glslVersion, glslBinding);
-						vkslPassData.fragmentCode = HLSLtoGLSL(glslPassData.code, GPT_FRAGMENT_PROGRAM, 
+						vkslPassData.fragmentCode = HLSLtoGLSL(glslPassData.code, GPT_FRAGMENT_PROGRAM,
 							CrossCompileOutput::VKSL45, vkslBinding);
 						break;
 					case GPT_GEOMETRY_PROGRAM:
 						hlslPassData.geometryCode = hlslPassData.code;
-						glslPassData.geometryCode = HLSLtoGLSL(glslPassData.code, GPT_GEOMETRY_PROGRAM, 
+						glslPassData.geometryCode = HLSLtoGLSL(glslPassData.code, GPT_GEOMETRY_PROGRAM,
 							glslVersion, glslBinding);
-						vkslPassData.geometryCode = HLSLtoGLSL(glslPassData.code, GPT_GEOMETRY_PROGRAM, 
+						vkslPassData.geometryCode = HLSLtoGLSL(glslPassData.code, GPT_GEOMETRY_PROGRAM,
 							CrossCompileOutput::VKSL45, vkslBinding);
 						break;
 					case GPT_HULL_PROGRAM:
 						hlslPassData.hullCode = hlslPassData.code;
-						glslPassData.hullCode = HLSLtoGLSL(glslPassData.code, GPT_HULL_PROGRAM, 
+						glslPassData.hullCode = HLSLtoGLSL(glslPassData.code, GPT_HULL_PROGRAM,
 							glslVersion, glslBinding);
-						vkslPassData.hullCode = HLSLtoGLSL(glslPassData.code, GPT_HULL_PROGRAM, 
+						vkslPassData.hullCode = HLSLtoGLSL(glslPassData.code, GPT_HULL_PROGRAM,
 							CrossCompileOutput::VKSL45, vkslBinding);
 						break;
 					case GPT_DOMAIN_PROGRAM:
 						hlslPassData.domainCode = hlslPassData.code;
-						glslPassData.domainCode = HLSLtoGLSL(glslPassData.code, GPT_DOMAIN_PROGRAM, 
+						glslPassData.domainCode = HLSLtoGLSL(glslPassData.code, GPT_DOMAIN_PROGRAM,
 							glslVersion, glslBinding);
-						vkslPassData.domainCode = HLSLtoGLSL(glslPassData.code, GPT_DOMAIN_PROGRAM, 
+						vkslPassData.domainCode = HLSLtoGLSL(glslPassData.code, GPT_DOMAIN_PROGRAM,
 							CrossCompileOutput::VKSL45, vkslBinding);
 						break;
 					case GPT_COMPUTE_PROGRAM:
 						hlslPassData.computeCode = hlslPassData.code;
-						glslPassData.computeCode = HLSLtoGLSL(glslPassData.code, GPT_COMPUTE_PROGRAM, 
+						glslPassData.computeCode = HLSLtoGLSL(glslPassData.code, GPT_COMPUTE_PROGRAM,
 							glslVersion, glslBinding);
-						vkslPassData.computeCode = HLSLtoGLSL(glslPassData.code, GPT_COMPUTE_PROGRAM, 
+						vkslPassData.computeCode = HLSLtoGLSL(glslPassData.code, GPT_COMPUTE_PROGRAM,
 							CrossCompileOutput::VKSL45, vkslBinding);
 						break;
 					default:

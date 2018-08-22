@@ -23,6 +23,7 @@
 #include "Resources/BsEngineShaderIncludeHandler.h"
 #include "Resources/BsResources.h"
 #include "BsEngineConfig.h"
+#include "GUI/BsProfilerOverlay.h"
 
 namespace bs
 {
@@ -100,6 +101,9 @@ namespace bs
 		CoreApplication::preUpdate();
 
 		VirtualInput::instance()._update();
+
+		if(mProfilerOverlay)
+			mProfilerOverlay->update();
 	}
 
 	void Application::postUpdate()
@@ -108,6 +112,28 @@ namespace bs
 
 		PROFILE_CALL(GUIManager::instance().update(), "GUI");
 		DebugDraw::instance()._update();
+	}
+
+	void Application::showProfilerOverlay(ProfilerOverlayType type, const SPtr<Camera>& camera)
+	{
+		const SPtr<Camera>& overlayCamera = camera ? camera : gSceneManager().getMainCamera();
+		if(!overlayCamera)
+			return;
+
+		if(!mProfilerOverlay)
+			mProfilerOverlay = bs_shared_ptr_new<ProfilerOverlay>(overlayCamera);
+		else
+			mProfilerOverlay->setTarget(overlayCamera);
+
+		mProfilerOverlay->show(type);
+	}
+
+	void Application::hideProfilerOverlay()
+	{
+		if(mProfilerOverlay)
+			mProfilerOverlay->hide();
+
+		mProfilerOverlay = nullptr;
 	}
 
 	void Application::loadScriptSystem()

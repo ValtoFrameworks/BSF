@@ -8,7 +8,7 @@
 #include "Math/BsVector2I.h"
 #include "BsApplication.h"
 
-#include "json.hpp"
+#include "ThirdParty/json.hpp"
 
 namespace bs
 {
@@ -19,7 +19,7 @@ namespace bs
 	/**	Types of builtin meshes that are always available. */
 	enum class BuiltinMesh
 	{
-		Box, Sphere, Cone, Quad, Disc
+		Box, Sphere, Cone, Cylinder, Quad, Disc
 	};
 
 	/**	Types of builtin textures that are always available. */
@@ -35,7 +35,9 @@ namespace bs
 		/** Physically based shader used for opaque 3D geometry. */
 		Standard, 
 		/** Physically based shader used for transparent 3D geometry. */
-		Transparent
+		Transparent,
+		/** Special shader used for rendering particles without any lighting. */
+		ParticlesUnlit
 	};
 
 	/**	Holds references to built-in resources used by the core engine. */
@@ -187,6 +189,7 @@ namespace bs
 		HShader mShaderSpriteLine;
 		HShader mShaderDiffuse;
 		HShader mShaderTransparent;
+		HShader mShaderParticlesUnlit;
 
 		SPtr<ResourceManifest> mResourceManifest;
 
@@ -245,10 +248,12 @@ namespace bs
 		static const String ShaderSpriteLineFile;
 		static const String ShaderDiffuseFile;
 		static const String ShaderTransparentFile;
+		static const String ShaderParticlesUnlitFile;
 
 		static const String MeshSphereFile;
 		static const String MeshBoxFile;
 		static const String MeshConeFile;
+		static const String MeshCylinderFile;
 		static const String MeshQuadFile;
 		static const String MeshDiscFile;
 

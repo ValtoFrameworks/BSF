@@ -28,7 +28,7 @@ Legend:
 - (bsfSource) - root directory of bs::framework
 - (DepName) - name of the dependency (title of each dependency shown below)
 - (Platform) - x86 for 32-bit builds, x64 for 64-bit builds
-- (Configuration) - Debug, OptimizedDebug or Release  
+- (Configuration) - Debug, RelWithDebInfo, MinSizeRel, or Release  
   
 Each library is accompanied by a Find***.cmake CMake module that is responsible for finding the library. These modules are located under `Source/CMake/Modules`. They follow the rules described above, but if you are unsure where library outputs should be placed you can look at the source code for those modules to find their search paths.
    
@@ -117,7 +117,7 @@ Additionally, if the dependency structure still isn't clear, download one of the
   - Requires libogg, as described in its readme file.
    
 **glslang**
-- glslang commit: 258b700f5957fc13b0512b3734a1b0e81a1c271d
+- glslang commit: 32d3ec319909fcad0b2b308fe1635198773e8316
 - https://github.com/KhronosGroup/glslang
 - Required by bsfVulkanRenderAPI
 - Compile as a static library

@@ -13,6 +13,14 @@ namespace bs
 	class LightProbeVolume;
 	struct RenderSettings;
 	struct EvaluatedAnimationData;
+	struct ParticleSimulationData;
+
+	/** Contains various data evaluated by external systems on a per-frame basis that is to be used by the renderer. */
+	struct PerFrameData
+	{
+		const EvaluatedAnimationData* animation = nullptr;
+		const ParticleSimulationData* particles = nullptr;
+	};
 
 	namespace ct
 	{
@@ -138,7 +146,7 @@ namespace bs
 		virtual const StringID& getName() const = 0;
 
 		/** Called in order to render all currently active cameras. */
-		virtual void renderAll(const EvaluatedAnimationData* animData) = 0;
+		virtual void renderAll(PerFrameData perFrameData) = 0;
 
 		/**
 		 * Called whenever a new camera is created.
@@ -262,6 +270,27 @@ namespace bs
 		 */
 		virtual void notifySkyboxRemoved(Skybox* skybox) { }
 
+		/**
+		 * Called whenever a new particle system is created.
+		 *
+		 * @note	Core thread.
+		 */
+		virtual void notifyParticleSystemAdded(ParticleSystem* particleSystem) { }
+
+		/**
+		 * Called whenever a particle system is updated.
+		 *
+		 * @note	Core thread.
+		 */
+		virtual void notifyParticleSystemUpdated(ParticleSystem* particleSystem, bool tfrmOnly) { }
+
+		/**
+		 * Called whenever a particle system is destroyed.
+		 *
+		 * @note	Core thread.
+		 */
+		virtual void notifyParticleSystemRemoved(ParticleSystem* particleSystem) { }
+
 		/** 
 		 * Captures the scene at the specified location into a cubemap. 
 		 * 
@@ -356,13 +385,6 @@ namespace bs
 		void setGlobalShaderOverride(const SPtr<bs::Shader>& shader);
 	protected:
 		friend class RendererTask;
-
-		/**	Contains information about a render callback. */
-		struct RenderCallbackData
-		{
-			bool overlay;
-			std::function<void()> callback;
-		};
 
 		/**
 		 * Executes all renderer tasks queued for this frame.

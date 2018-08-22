@@ -1,0 +1,166 @@
+#include "$ENGINE$\PerCameraData.bslinc"
+
+mixin ParticleVertex
+{
+	mixin PerCameraData;
+
+	variations
+	{
+		ORIENT = { 0, 1, 2 }; // 0 - Camera plane, 1 - Camera position, 2 - Axis
+		LOCK_Y = { false, true };
+		GPU = { false, true };
+	};
+
+	code
+	{
+		struct VertexInput
+		{
+			float2 position : POSITION;
+			float2 uv0 : TEXCOORD0;
+			uint instanceId	: SV_InstanceID;		
+		};
+	
+		struct ParticleInput
+		{
+			float3 position;
+			float rotation;
+			float2 uvflip;
+			float2 size;
+			float3 velocity;
+			float frame;
+			float4 color;
+		};
+	
+		struct VStoFS
+		{
+			float4 position : SV_Position;
+			float2 uv0 : TEXCOORD0;
+			float4 color : COLOR0;
+		};
+		
+		#if GPU
+		Texture2D gPositionAndTimeTex; // position in .xyz, time (in [0, 1] range) in .w
+
+		ParticleInput getParticleInput(uint2 index)
+		{
+			uint3 pixelPos;
+			pixelPos.xy = index;
+			pixelPos.z = 0;
+			
+			ParticleInput pi;
+			
+			float4 posAndTime = gPositionAndTimeTex.Load(pixelPos);
+			pi.position = posAndTime.xyz;
+			pi.rotation = 0.0f; // TODO
+			
+			float time = posAndTime.w;
+			float aliveMask = step(time, 1.0f);
+			
+			pi.uvflip = 1.0f; // TODO
+			pi.size = aliveMask; // TODO
+			pi.frame = 0; // TODO
+			
+			pi.color = 1.0f; // TODO
+			
+			return pi;
+		}
+		#else
+		Texture2D gPositionAndRotTex; // position in .xyz, rotation in radians in .w
+		Texture2D gColorTex;
+		Texture2D gSizeAndFrameIdxTex; // size in .xy, uv flip encoded in sign of .xy, frame index in .z, .w unused
+		
+		ParticleInput getParticleInput(uint2 index)
+		{
+			uint3 pixelPos;
+			pixelPos.xy = index;
+			pixelPos.z = 0;
+			
+			ParticleInput pi;
+			
+			float4 posAndRot = gPositionAndRotTex.Load(pixelPos);
+			pi.position = posAndRot.xyz;
+			pi.rotation = posAndRot.w;
+			
+			float4 sizeAndFrame = gSizeAndFrameIdxTex.Load(pixelPos);
+			pi.uvflip = sign(sizeAndFrame.xy);
+			pi.size = abs(sizeAndFrame.xy);
+			pi.frame = sizeAndFrame.z;
+			
+			pi.color = gColorTex.Load(pixelPos);
+			
+			return pi;
+		}
+		#endif
+		
+		Buffer<uint2> gIndices;
+
+		[internal]
+		cbuffer ParticleParams
+		{
+			float4x4 gWorldTfrm;
+			float4 gSubImageSize; // .xy column/row count, .zw inverse column/row count
+			float2 gUVOffset;
+			float2 gUVSize;
+			float3 gAxisUp;
+			uint gTexSize;
+			float3 gAxisRight;
+		}
+		
+		VStoFS vsmain(VertexInput input)
+		{
+			ParticleInput pi = getParticleInput(gIndices[input.instanceId]);
+		
+			float4 worldPosition = mul(gWorldTfrm, float4(pi.position, 1.0f));
+		
+			float3 axisRight, axisUp;
+			#if ORIENT == 2 // Axis
+				axisRight = gAxisRight;
+				axisUp = gAxisUp;
+			#elif ORIENT == 1 // Towards camera origin
+				float3 diff = gViewOrigin - worldPosition.xyz;
+				
+				float3 cameraUp = float3(gMatView[1][0], gMatView[1][1], gMatView[1][2]);
+				axisRight = normalize(cross(diff, cameraUp));
+				
+				#if LOCK_Y
+					axisUp = float3(0, 1, 0);
+				#else
+					axisUp = normalize(cross(axisRight, diff));
+				#endif
+			#else // Towards camera plane
+				axisRight = float3(gMatView[0][0], gMatView[0][1], gMatView[0][2]);
+				
+				#if LOCK_Y
+					axisUp = float3(0, 1, 0);				
+				#else
+					axisUp = float3(gMatView[1][0], gMatView[1][1], gMatView[1][2]);
+				#endif
+			#endif
+
+			float rotSin, rotCos;
+			sincos(pi.rotation, rotSin, rotCos);
+			
+			float3 rotAxisRight = rotSin * axisUp + rotCos * axisRight;
+			float3 rotAxisUp = rotCos * axisUp - rotSin * axisRight;
+			
+			worldPosition.xyz += rotAxisRight * input.position.x * pi.size.x + rotAxisUp * input.position.y  * pi.size.y;	
+			
+			float2 uv;
+			uv.x = pi.uvflip.x >= 0.0f ? input.uv0.x : 1.0f - input.uv0.x;
+			uv.y = pi.uvflip.y >= 0.0f ? input.uv0.y : 1.0f - input.uv0.y;
+			
+			float frame = pi.frame - frac(pi.frame);
+			float row = fmod(frame, gSubImageSize.x);
+			float column = floor(frame * gSubImageSize.z);
+			
+			float2 subUV = (float2(row, column) + uv) * gSubImageSize.zw;
+			
+			VStoFS output;
+			output.color = pi.color;
+			output.uv0 = gUVOffset + subUV * gUVSize;
+			output.position = mul(gMatViewProj, worldPosition);
+		
+			return output;
+		}
+	};
+};

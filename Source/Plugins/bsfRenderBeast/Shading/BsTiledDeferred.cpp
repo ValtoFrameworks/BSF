@@ -23,9 +23,6 @@ namespace bs { namespace ct
 		if (mParams->hasLoadStoreTexture(GPT_COMPUTE_PROGRAM, "gOutput"))
 			mParams->getLoadStoreTextureParam(GPT_COMPUTE_PROGRAM, "gOutput", mOutputTextureParam);
 
-		if (mParams->hasBuffer(GPT_COMPUTE_PROGRAM, "gOutput"))
-			mParams->getBufferParam(GPT_COMPUTE_PROGRAM, "gOutput", mOutputBufferParam);
-
 		if (mSampleCount > 1)
 			mParams->getTextureParam(GPT_COMPUTE_PROGRAM, "gMSAACoverage", mMSAACoverageTexParam);
 
@@ -39,9 +36,11 @@ namespace bs { namespace ct
 	}
 
 	void TiledDeferredLightingMat::execute(const RendererView& view, const VisibleLightData& lightData, 
-		const GBufferTextures& gbuffer, const SPtr<Texture>& lightAccumTex, const SPtr<GpuBuffer>& lightAccumBuffer,
+		const GBufferTextures& gbuffer, const SPtr<Texture>& lightAccumTex, const SPtr<Texture>& lightAccumTexArray, 
 		const SPtr<Texture>& msaaCoverage)
 	{
+		BS_RENMAT_PROFILE_BLOCK
+
 		const RendererViewProperties& viewProps = view.getProperties();
 		const RenderSettings& settings = view.getRenderSettings();
 
@@ -103,7 +102,7 @@ namespace bs { namespace ct
 
 		if (mSampleCount > 1)
 		{
-			mOutputBufferParam.set(lightAccumBuffer);
+			mOutputTextureParam.set(lightAccumTexArray, TextureSurface::COMPLETE);
 			mMSAACoverageTexParam.set(msaaCoverage);
 		}
 		else
@@ -132,35 +131,70 @@ namespace bs { namespace ct
 		}
 	}
 
-	FlatFramebufferToTextureParamDef gFlatFramebufferToTextureParamDef;
-
-	FlatFramebufferToTextureMat::FlatFramebufferToTextureMat()
+	TextureArrayToMSAATexture::TextureArrayToMSAATexture()
 	{
-		mParams->getBufferParam(GPT_FRAGMENT_PROGRAM, "gInput", mInputParam);
-
-		mParamBuffer = gTiledLightingParamDef.createBuffer();
-		mParams->setParamBlockBuffer("Params", mParamBuffer);
+		mParams->getTextureParam(GPT_FRAGMENT_PROGRAM, "gInput", mInputParam);
 	}
 
-	void FlatFramebufferToTextureMat::execute(const SPtr<GpuBuffer>& flatFramebuffer, const SPtr<Texture>& target)
+	void TextureArrayToMSAATexture::execute(const SPtr<Texture>& inputArray, const SPtr<Texture>& target)
 	{
-		const TextureProperties& props = target->getProperties();
+		BS_RENMAT_PROFILE_BLOCK
 
-		Vector2I framebufferSize;
-		framebufferSize[0] = props.getWidth();
-		framebufferSize[1] = props.getHeight();
-		gFlatFramebufferToTextureParamDef.gFramebufferSize.set(mParamBuffer, framebufferSize);
+		const TextureProperties& inputProps = inputArray->getProperties();
+		const TextureProperties& targetProps = target->getProperties();
 
-		gFlatFramebufferToTextureParamDef.gSampleCount.set(mParamBuffer, props.getNumSamples());
+		assert(inputProps.getNumArraySlices() == targetProps.getNumSamples());
+		assert(inputProps.getWidth() == targetProps.getWidth());
+		assert(inputProps.getHeight() == targetProps.getHeight());
 
-		mParamBuffer->flushToGPU();
-
-		mInputParam.set(flatFramebuffer);
+		mInputParam.set(inputArray);
 
 		bind();
 
-		Rect2 area(0.0f, 0.0f, (float)props.getWidth(), (float)props.getHeight());
+		Rect2 area(0.0f, 0.0f, (float)targetProps.getWidth(), (float)targetProps.getHeight());
 		gRendererUtility().drawScreenQuad(area);
+	}
+
+	ClearLoadStoreParamDef gClearLoadStoreParamDef;
+
+	ClearLoadStore::ClearLoadStore()
+	{
+		mParams->getLoadStoreTextureParam(GPT_COMPUTE_PROGRAM, "gOutput", mOutputParam);
+
+		mParamBuffer = gClearLoadStoreParamDef.createBuffer();
+		mParams->setParamBlockBuffer(GPT_COMPUTE_PROGRAM, "Params", mParamBuffer);
+	}
+
+	void ClearLoadStore::_initDefines(ShaderDefines& defines)
+	{
+		defines.set("TILE_SIZE", TILE_SIZE);
+		defines.set("NUM_THREADS", NUM_THREADS);
+	}
+
+	void ClearLoadStore::execute(const SPtr<Texture>& target, const TextureSurface& surface)
+	{
+		BS_RENMAT_PROFILE_BLOCK
+
+		const TextureProperties& props = target->getProperties();
+		PixelFormat pf = props.getFormat();
+
+		assert(!PixelUtil::isCompressed(pf));
+
+		UINT32 numBytes = PixelUtil::getNumElemBytes(pf);
+		assert(numBytes % 4 == 0);
+
+		mOutputParam.set(target, surface);
+
+		bind();
+
+		UINT32 numElements = numBytes / 4;
+		UINT32 width = props.getWidth() * numElements;
+		UINT32 height = props.getHeight() * numElements;
+
+		UINT32 numGroupsX = Math::divideAndRoundUp(width, NUM_THREADS * TILE_SIZE);
+		UINT32 numGroupsY = Math::divideAndRoundUp(height, NUM_THREADS * TILE_SIZE);
+		
+		RenderAPI::instance().dispatchCompute(numGroupsX, numGroupsY);
 	}
 
 	TiledImageBasedLightingParamDef gTiledImageBasedLightingParamDef;
@@ -180,13 +214,10 @@ namespace bs { namespace ct
 		mParams->getTextureParam(GPT_COMPUTE_PROGRAM, "gDepthBufferTex", mGBufferDepth);
 
 		mParams->getTextureParam(GPT_COMPUTE_PROGRAM, "gInColor", mInColorTextureParam);
+		mParams->getLoadStoreTextureParam(GPT_COMPUTE_PROGRAM, "gOutput", mOutputTextureParam);
+
 		if (mSampleCount > 1)
-		{
 			mParams->getTextureParam(GPT_COMPUTE_PROGRAM, "gMSAACoverage", mMSAACoverageTexParam);
-			mParams->getBufferParam(GPT_COMPUTE_PROGRAM, "gOutput", mOutputBufferParam);
-		}
-		else
-			mParams->getLoadStoreTextureParam(GPT_COMPUTE_PROGRAM, "gOutput", mOutputTextureParam);
 
 		mParamBuffer = gTiledImageBasedLightingParamDef.createBuffer();
 		mParams->setParamBlockBuffer("Params", mParamBuffer);
@@ -204,6 +235,8 @@ namespace bs { namespace ct
 	void TiledDeferredImageBasedLightingMat::execute(const RendererView& view, const SceneInfo& sceneInfo, 
 		const VisibleReflProbeData& probeData, const Inputs& inputs)
 	{
+		BS_RENMAT_PROFILE_BLOCK
+
 		const RendererViewProperties& viewProps = view.getProperties();
 		UINT32 width = viewProps.viewRect.width;
 		UINT32 height = viewProps.viewRect.height;
@@ -213,7 +246,11 @@ namespace bs { namespace ct
 		framebufferSize[1] = height;
 		gTiledImageBasedLightingParamDef.gFramebufferSize.set(mParamBuffer, framebufferSize);
 
-		mReflProbeParamBuffer.populate(sceneInfo.skybox, probeData.getNumProbes(), sceneInfo.reflProbeCubemapsTex, 
+		Skybox* skybox = nullptr; 
+		if(view.getRenderSettings().enableSkybox)
+			skybox = sceneInfo.skybox;
+
+		mReflProbeParamBuffer.populate(skybox, probeData.getNumProbes(), sceneInfo.reflProbeCubemapsTex, 
 			viewProps.capturingReflections);
 
 		mParamBuffer->flushToGPU();
@@ -225,8 +262,8 @@ namespace bs { namespace ct
 		mGBufferDepth.set(inputs.gbuffer.depth);
 
 		SPtr<Texture> skyFilteredRadiance;
-		if(sceneInfo.skybox)
-			skyFilteredRadiance = sceneInfo.skybox->getFilteredRadiance();
+		if(skybox)
+			skyFilteredRadiance = skybox->getFilteredRadiance();
 
 		mImageBasedParams.preintegratedEnvBRDFParam.set(inputs.preIntegratedGF);
 		mImageBasedParams.reflectionProbesParam.set(probeData.getProbeBuffer());
@@ -240,7 +277,7 @@ namespace bs { namespace ct
 		mInColorTextureParam.set(inputs.lightAccumulation);
 		if (mSampleCount > 1)
 		{
-			mOutputBufferParam.set(inputs.sceneColorBuffer);
+			mOutputTextureParam.set(inputs.sceneColorTexArray, TextureSurface::COMPLETE);
 			mMSAACoverageTexParam.set(inputs.msaaCoverage);
 		}
 		else

@@ -6,11 +6,8 @@
 #include "Managers/BsRenderAPIManager.h"
 
 #include "Platform/BsPlatform.h"
-#include "Managers/BsHardwareBufferManager.h"
 #include "RenderAPI/BsRenderWindow.h"
-#include "RenderAPI/BsViewport.h"
 #include "Math/BsVector2.h"
-#include "RenderAPI/BsGpuProgram.h"
 #include "CoreThread/BsCoreObjectManager.h"
 #include "Scene/BsGameObjectManager.h"
 #include "Utility/BsDynLib.h"
@@ -18,7 +15,6 @@
 #include "Scene/BsSceneManager.h"
 #include "Importer/BsImporter.h"
 #include "Resources/BsResources.h"
-#include "Mesh/BsMesh.h"
 #include "Scene/BsSceneObject.h"
 #include "Utility/BsTime.h"
 #include "Input/BsInput.h"
@@ -48,11 +44,10 @@
 #include "Audio/BsAudio.h"
 #include "Animation/BsAnimationManager.h"
 #include "Renderer/BsParamBlocks.h"
+#include "Particles/BsParticleManager.h"
 
 namespace bs
 {
-	constexpr UINT32 CoreApplication::MAX_FIXED_UPDATES_PER_FRAME;
-
 	CoreApplication::CoreApplication(START_UP_DESC desc)
 		: mPrimaryWindow(nullptr), mStartUpDesc(desc), mRendererPlugin(nullptr), mIsFrameRenderingFinished(true)
 		, mSimThreadId(BS_THREAD_CURRENT_ID), mRunMainLoop(false)
@@ -85,10 +80,11 @@ namespace bs
 		AudioManager::shutDown();
 		ResourceListenerManager::shutDown();
 		RenderStateManager::shutDown();
+		ParticleManager::shutDown();
+		AnimationManager::shutDown();
 
 		// This must be done after all resources are released since it will unload the physics plugin, and some resources
 		// might be instances of types from that plugin.
-		AnimationManager::shutDown();
 		PhysicsManager::shutDown();
 
 		RendererManager::shutDown();
@@ -173,6 +169,7 @@ namespace bs
 		AudioManager::startUp(mStartUpDesc.audio);
 		PhysicsManager::startUp(mStartUpDesc.physics, isEditor());
 		AnimationManager::startUp();
+		ParticleManager::startUp();
 
 		for (auto& importerName : mStartUpDesc.importers)
 			loadPlugin(importerName);
@@ -230,37 +227,16 @@ namespace bs
 
 			// Trigger fixed updates if required
 			{
-				UINT64 currentTime = gTime().getTimePrecise();
+				UINT64 step;
+				const UINT32 numIterations = gTime()._getFixedUpdateStep(step);
 
-				// Skip fixed update first frame (time delta is zero, and no input received yet)
-				if(mFirstFrame)
+				const float stepSeconds = step / 1000000.0f;
+				for (UINT32 i = 0; i < numIterations; i++)
 				{
-					mLastFixedUpdateTime = currentTime;
-					mFirstFrame = false;
-				}
+					PROFILE_CALL(gSceneManager()._fixedUpdate(), "Scene fixed update");
+					gPhysics().fixedUpdate(stepSeconds);
 
-				UINT64 nextFrameTime = mLastFixedUpdateTime + mFixedStep;
-				if(nextFrameTime <= currentTime)
-				{
-					INT64 simulationAmount = (INT64)std::max(currentTime - mLastFixedUpdateTime, mFixedStep); // At least one step
-					UINT32 numIterations = (UINT32)Math::divideAndRoundUp(simulationAmount, (INT64)mFixedStep);
-
-					// If too many iterations are required, increase time step. This should only happen in extreme 
-					// situations (or when debugging).
-					INT64 step = (INT64)mFixedStep;
-					if (numIterations > (INT32)MAX_FIXED_UPDATES_PER_FRAME)
-						step = Math::divideAndRoundUp(simulationAmount, (INT64)MAX_FIXED_UPDATES_PER_FRAME);
-
-					while (simulationAmount >= step) // In case we're running really slow multiple updates might be needed
-					{
-						float stepSeconds = step / 1000000.0f;
-
-						PROFILE_CALL(gSceneManager()._fixedUpdate(), "Scene fixed update");
-						gPhysics().fixedUpdate(stepSeconds);
-
-						simulationAmount -= step;
-						mLastFixedUpdateTime += step;
-					}
+					gTime()._advanceFixedUpdate(step);
 				}
 			}
 
@@ -274,9 +250,12 @@ namespace bs
 
 			postUpdate();
 
+			PerFrameData perFrameData;
+
 			// Evaluate animation after scene and plugin updates because the renderer will just now be displaying the
 			// animation we sent on the previous frame, and we want the scene information to match to what is displayed.
-			const EvaluatedAnimationData* animData = AnimationManager::instance().update();
+			perFrameData.animation = AnimationManager::instance().update();
+			perFrameData.particles = ParticleManager::instance().update(*perFrameData.animation);
 
 			// Send out resource events in case any were loaded/destroyed/modified
 			ResourceListenerManager::instance().update();
@@ -286,7 +265,7 @@ namespace bs
 			RendererManager::instance().getActive()->update();
 
 			gSceneManager()._updateCoreObjectTransforms();
-			PROFILE_CALL(RendererManager::instance().getActive()->renderAll(animData), "Render");
+			PROFILE_CALL(RendererManager::instance().getActive()->renderAll(perFrameData), "Render");
 
 			// Core and sim thread run in lockstep. This will result in a larger input latency than if I was 
 			// running just a single thread. Latency becomes worse if the core thread takes longer than sim 
@@ -357,7 +336,10 @@ namespace bs
 
 	void CoreApplication::setFPSLimit(UINT32 limit)
 	{
-		mFrameStep = (UINT64)1000000 / limit;
+		if(limit > 0)
+			mFrameStep = (UINT64)1000000 / limit;
+		else
+			mFrameStep = 0;
 	}
 
 	void CoreApplication::frameRenderingFinishedCallback()

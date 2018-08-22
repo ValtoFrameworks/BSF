@@ -291,7 +291,7 @@ namespace bs
 		}
 
 		/** Sets this vector's components to the minimum of its own and the ones of the passed in vector. */
-		void floor(const Vector3& cmp)
+		void min(const Vector3& cmp)
 		{
 			if (cmp.x < x) x = cmp.x;
 			if (cmp.y < y) y = cmp.y;
@@ -299,7 +299,7 @@ namespace bs
 		}
 
 		/** Sets this vector's components to the maximum of its own and the ones of the passed in vector. */
-		void ceil(const Vector3& cmp)
+		void max(const Vector3& cmp)
 		{
 			if (cmp.x > x) x = cmp.x;
 			if (cmp.y > y) y = cmp.y;
@@ -419,4 +419,21 @@ namespace bs
 	/** @cond SPECIALIZATIONS */
 	BS_ALLOW_MEMCPY_SERIALIZATION(Vector3);
 	/** @endcond */
-}
+} 
+
+/** @cond SPECIALIZATIONS */
+namespace std 
+{
+	template<> class numeric_limits<bs::Vector3> 
+	{
+	public:
+		constexpr static bs::Vector3 infinity() 
+		{
+			return bs::Vector3(
+				std::numeric_limits<float>::infinity(), 
+				std::numeric_limits<float>::infinity(), 
+				std::numeric_limits<float>::infinity());
+		}
+	};
+} 
+/** @endcond */
