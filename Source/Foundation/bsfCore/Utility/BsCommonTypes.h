@@ -81,9 +81,9 @@ namespace bs
 	/**	Types of frame buffers. */
 	enum FrameBufferType
 	{
-		FBT_COLOR = 0x1, /**< Clear the color surface. */
-		FBT_DEPTH = 0x2, /**< Clear the depth surface. */
-		FBT_STENCIL = 0x4 /**< Clear the stencil surface. */
+		FBT_COLOR = 0x1, /**< Color surface. */
+		FBT_DEPTH = 0x2, /**< Depth surface. */
+		FBT_STENCIL = 0x4 /**< Stencil surface. */
 	};
 
 	/**
@@ -549,7 +549,7 @@ namespace bs
 		RT_DEPTH = 1 << 30,
 		RT_STENCIL = 1 << 31,
 		RT_DEPTH_STENCIL = (1 << 30) | (1 << 31),
-		RT_ALL = 0xFF
+		RT_ALL = 0xFFFFFFFF
 	};
 
 	typedef Flags<RenderSurfaceMaskBits> RenderSurfaceMask;
@@ -656,18 +656,6 @@ namespace bs
 	};
 
 	typedef Map<String, String> NameValuePairList;
-
-	template<bool Core> struct TMeshType {};
-	template<> struct TMeshType < false > { typedef HMesh Type; };
-	template<> struct TMeshType < true > { typedef SPtr<ct::Mesh> Type; };
-
-	template<bool Core> struct TMaterialPtrType {};
-	template<> struct TMaterialPtrType < false > { typedef HMaterial Type; };
-	template<> struct TMaterialPtrType < true > { typedef SPtr<ct::Material> Type; };
-
-	template<bool Core> struct TTextureType {};
-	template<> struct TTextureType < false > { typedef HTexture Type; };
-	template<> struct TTextureType < true > { typedef SPtr<ct::Texture> Type; };
 
 	/** @cond SPECIALIZATIONS */
 	BS_ALLOW_MEMCPY_SERIALIZATION(TextureSurface);

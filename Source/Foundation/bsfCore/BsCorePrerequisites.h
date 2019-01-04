@@ -132,7 +132,7 @@
  */
 
 /** @defgroup Particles-Internal Particles
- *	Emission, updated and rendering of particles in the particle system.
+ *	Emission, updates and rendering of particles in the particle system.
  */
 
 /** @defgroup Physics-Internal Physics
@@ -221,41 +221,125 @@
 
 namespace bs 
 {
+	// Core objects
+	template<class T>
+	struct CoreThreadType
+	{ };
+
+#define CORE_OBJECT_FORWARD_DECLARE(TYPE)				\
+	class TYPE;											\
+	namespace ct { class TYPE; }						\
+	template<> struct CoreThreadType<TYPE> { typedef ct::TYPE Type; };
+
+	CORE_OBJECT_FORWARD_DECLARE(IndexBuffer)
+	CORE_OBJECT_FORWARD_DECLARE(VertexBuffer)
+	CORE_OBJECT_FORWARD_DECLARE(GpuBuffer)
+	CORE_OBJECT_FORWARD_DECLARE(GpuProgram)
+	CORE_OBJECT_FORWARD_DECLARE(Pass)
+	CORE_OBJECT_FORWARD_DECLARE(Technique)
+	CORE_OBJECT_FORWARD_DECLARE(Shader)
+	CORE_OBJECT_FORWARD_DECLARE(Material)
+	CORE_OBJECT_FORWARD_DECLARE(RenderTarget)
+	CORE_OBJECT_FORWARD_DECLARE(RenderTexture)
+	CORE_OBJECT_FORWARD_DECLARE(RenderWindow)
+	CORE_OBJECT_FORWARD_DECLARE(SamplerState)
+	CORE_OBJECT_FORWARD_DECLARE(Viewport)
+	CORE_OBJECT_FORWARD_DECLARE(VertexDeclaration)
+	CORE_OBJECT_FORWARD_DECLARE(DepthStencilState)
+	CORE_OBJECT_FORWARD_DECLARE(RasterizerState)
+	CORE_OBJECT_FORWARD_DECLARE(BlendState)
+	CORE_OBJECT_FORWARD_DECLARE(GpuParamBlockBuffer)
+	CORE_OBJECT_FORWARD_DECLARE(GpuParams)
+	CORE_OBJECT_FORWARD_DECLARE(GpuParamsSet)
+	CORE_OBJECT_FORWARD_DECLARE(MaterialParams)
+	CORE_OBJECT_FORWARD_DECLARE(Light)
+	CORE_OBJECT_FORWARD_DECLARE(Camera)
+	CORE_OBJECT_FORWARD_DECLARE(Renderable)
+	CORE_OBJECT_FORWARD_DECLARE(GraphicsPipelineState)
+	CORE_OBJECT_FORWARD_DECLARE(ComputePipelineState)
+	CORE_OBJECT_FORWARD_DECLARE(ReflectionProbe)
+	CORE_OBJECT_FORWARD_DECLARE(ParticleSystem)
+	CORE_OBJECT_FORWARD_DECLARE(Texture)
+	CORE_OBJECT_FORWARD_DECLARE(SpriteTexture)
+	CORE_OBJECT_FORWARD_DECLARE(Mesh)
+	CORE_OBJECT_FORWARD_DECLARE(VectorField)
+	CORE_OBJECT_FORWARD_DECLARE(Skybox)
+	CORE_OBJECT_FORWARD_DECLARE(Decal)
+
+	class Collider;
+	class Rigidbody;
+	class BoxCollider;
+	class SphereCollider;
+	class PlaneCollider;
+	class CapsuleCollider;
+	class MeshCollider;
+	class Joint;
+	class FixedJoint;
+	class DistanceJoint;
+	class HingeJoint;
+	class SphericalJoint;
+	class SliderJoint;
+	class D6Joint;
+	class CharacterController;
+	class AudioListener;
+	class AudioSource;
+	class Animation;
+	class Bone;
+	class LightProbeVolume;
+
+	// Components
+	template<class T>
+	struct ComponentType
+	{ };
+
+#define COMPONENT_FORWARD_DECLARE(TYPE)								\
+	class C##TYPE;													\
+	template<> struct ComponentType<TYPE> { typedef C##TYPE Type; };
+
+	COMPONENT_FORWARD_DECLARE(Collider)
+	COMPONENT_FORWARD_DECLARE(Rigidbody)
+	COMPONENT_FORWARD_DECLARE(BoxCollider)
+	COMPONENT_FORWARD_DECLARE(SphereCollider)
+	COMPONENT_FORWARD_DECLARE(PlaneCollider)
+	COMPONENT_FORWARD_DECLARE(CapsuleCollider)
+	COMPONENT_FORWARD_DECLARE(MeshCollider)
+	COMPONENT_FORWARD_DECLARE(Joint)
+	COMPONENT_FORWARD_DECLARE(HingeJoint)
+	COMPONENT_FORWARD_DECLARE(DistanceJoint)
+	COMPONENT_FORWARD_DECLARE(FixedJoint)
+	COMPONENT_FORWARD_DECLARE(SphericalJoint)
+	COMPONENT_FORWARD_DECLARE(SliderJoint)
+	COMPONENT_FORWARD_DECLARE(D6Joint)
+	COMPONENT_FORWARD_DECLARE(CharacterController)
+	COMPONENT_FORWARD_DECLARE(Camera)
+	COMPONENT_FORWARD_DECLARE(Renderable)
+	COMPONENT_FORWARD_DECLARE(Light)
+	COMPONENT_FORWARD_DECLARE(Animation)
+	COMPONENT_FORWARD_DECLARE(Bone)
+	COMPONENT_FORWARD_DECLARE(AudioSource)
+	COMPONENT_FORWARD_DECLARE(AudioListener)
+	COMPONENT_FORWARD_DECLARE(ReflectionProbe)
+	COMPONENT_FORWARD_DECLARE(Skybox)
+	COMPONENT_FORWARD_DECLARE(LightProbeVolume)
+	COMPONENT_FORWARD_DECLARE(ParticleSystem)
+	COMPONENT_FORWARD_DECLARE(Decal)
+
 	class Color;
-	class GpuProgram;
 	class GpuProgramManager;
-	class IndexBuffer;
-	class VertexBuffer;
-	class GpuBuffer;
 	class GpuProgramManager;
 	class GpuProgramFactory;
 	class IndexData;
-	class Pass;
-	class Technique;
-	class Shader;
-	class Material;
 	class RenderAPICapabilities;
-	class RenderTarget;
-	class RenderTexture;
-	class RenderWindow;
 	class RenderTargetProperties;
-	class SamplerState;
 	class TextureManager;
-	class Viewport;
-	class VertexDeclaration;
 	class Input;
 	struct PointerEvent;
 	class RendererFactory;
 	class AsyncOp;
 	class HardwareBufferManager;
 	class FontManager;
-	class DepthStencilState;
 	class RenderStateManager;
-	class RasterizerState;
-	class BlendState;
 	class GpuParamBlock;
-	class GpuParamBlockBuffer;
-	class GpuParams;
 	struct GpuParamDesc;
 	struct GpuParamDataDesc;
 	struct GpuParamObjectDesc;
@@ -286,80 +370,27 @@ namespace bs
 	class Prefab;
 	class PrefabDiff;
 	class RendererMeshData;
-	class Light;
 	class Win32Window;
 	class RenderAPIFactory;
 	class PhysicsManager;
 	class Physics;
 	class FCollider;
-	class Collider;
-	class Rigidbody;
 	class PhysicsMaterial;
-	class BoxCollider;
-	class SphereCollider;
-	class PlaneCollider;
-	class CapsuleCollider;
-	class MeshCollider;
-	class CCollider;
-	class CRigidbody;
-	class CBoxCollider;
-	class CSphereCollider;
-	class CPlaneCollider;
-	class CCapsuleCollider;
-	class CMeshCollider;
-	class Joint;
-	class FixedJoint;
-	class DistanceJoint;
-	class HingeJoint;
-	class SphericalJoint;
-	class SliderJoint;
-	class D6Joint;
-	class CharacterController;
-	class CJoint;
-	class CHingeJoint;
-	class CDistanceJoint;
-	class CFixedJoint;
-	class CSphericalJoint;
-	class CSliderJoint;
-	class CD6Joint;
-	class CCharacterController;
 	class ShaderDefines;
 	class ShaderImportOptions;
-	class AudioListener;
-	class AudioSource;
 	class AudioClipImportOptions;
 	class AnimationClip;
-	class CCamera;
-	class CRenderable;
-	class CLight;
-	class CAnimation;
-	class CBone;
-	class CAudioSource;
-	class CAudioListener;
 	class GpuPipelineParamInfo;
-	class MaterialParams;
 	template <class T> class TAnimationCurve;
 	struct AnimationCurves;
 	class Skeleton;
-	class Animation;
-	class GpuParamsSet;
-	class Camera;
-	class Renderable;
 	class MorphShapes;
 	class MorphShape;
 	class MorphChannel;
-	class GraphicsPipelineState;
-	class ComputePipelineState;
-	class ReflectionProbe;
-	class CReflectionProbe;
-	class CSkybox;
-	class CLightProbeVolume;
 	class Transform;
 	class SceneActor;
 	class CoreObjectManager;
 	struct CollisionData;
-	class ParticleSystem;
-	class CParticleSystem;
 	// Asset import
 	class SpecificImporter;
 	class Importer;
@@ -367,8 +398,6 @@ namespace bs
 	class Resource;
 	class Resources;
 	class ResourceManifest;
-	class Texture;
-	class Mesh;
 	class MeshBase;
 	class TransientMesh;
 	class MeshHeap;
@@ -379,7 +408,6 @@ namespace bs
 	class PhysicsMaterial;
 	class PhysicsMesh;
 	class AudioClip;
-	class SpriteTexture;
 	// Scene
 	class SceneObject;
 	class Component;
@@ -414,41 +442,11 @@ namespace bs
 	{
 		class Renderer;
 		class VertexData;
-		class SamplerState;
-		class IndexBuffer;
-		class VertexBuffer;
 		class RenderAPI;
-		class RenderTarget;
-		class RenderTexture;
-		class RenderWindow;
-		class DepthStencilState;
-		class RasterizerState;
-		class BlendState;
 		class CoreObject;
-		class Camera;
-		class Renderable;
 		class MeshBase;
-		class Mesh;
 		class TransientMesh;
-		class Texture;
 		class MeshHeap;
-		class VertexDeclaration;
-		class GpuBuffer;
-		class GpuParamBlockBuffer;
-		class GpuParams;
-		class Shader;
-		class Viewport;
-		class Pass;
-		class GpuParamsSet;
-		class Technique;
-		class Material;
-		class GpuProgram;
-		class Light;
-		class ComputePipelineState;
-		class GraphicsPipelineState;
-		class Camera;
-		class GpuParamsSet;
-		class MaterialParams;
 		class GpuPipelineParamInfo;
 		class CommandBuffer;
 		class EventQuery;
@@ -459,10 +457,6 @@ namespace bs
 		class RenderWindowManager;
 		class RenderStateManager;
 		class HardwareBufferManager;
-		class ReflectionProbe;
-		class Skybox;
-		class ParticleSystem;
-		class SpriteTexture;
 	}
 }
 
@@ -630,6 +624,19 @@ namespace bs
 		TID_ParticleSystemEvolvers = 1177,
 		TID_CParticleSystem = 1178,
 		TID_ParticleGravity = 1179,
+		TID_VectorField = 1180,
+		TID_ParticleVectorFieldSettings = 1181,
+		TID_ParticleGpuSimulationSettings = 1182,
+		TID_ParticleDepthCollisionSettings = 1183,
+		TID_BloomSettings = 1184,
+		TID_ParticleBurst = 1185,
+		TID_CoreSerializationContext = 1186,
+		TID_ParticleForce = 1187,
+		TID_ParticleSize = 1188,
+		TID_ParticleColor = 1189,
+		TID_ParticleRotation = 1190,
+		TID_Decal = 1191,
+		TID_CDecal = 1192,
 
 		// Moved from Engine layer
 		TID_CCamera = 30000,
@@ -676,6 +683,7 @@ namespace bs
 	typedef ResourceHandle<AudioClip> HAudioClip;
 	typedef ResourceHandle<AnimationClip> HAnimationClip;
 	typedef ResourceHandle<SpriteTexture> HSpriteTexture;
+	typedef ResourceHandle<VectorField> HVectorField;
 
 	/** @} */
 }
@@ -717,6 +725,7 @@ namespace bs
 	typedef GameObjectHandle<CAudioSource> HAudioSource;
 	typedef GameObjectHandle<CAudioListener> HAudioListener;
 	typedef GameObjectHandle<CParticleSystem> HParticleSystem;
+	typedef GameObjectHandle<CDecal> HDecal;
 
 	/** @} */
 }
@@ -768,6 +777,90 @@ namespace bs
 
 	/** Used for marking a CoreObject dependency as dirty. */
 	static constexpr INT32 DIRTY_DEPENDENCY_MASK = 1 << 31;
+
+	template<class T, bool Core>
+	struct CoreVariant { };
+
+	template<class T>
+	struct CoreVariant<T, false> { typedef T Type; };
+
+	template<class T> struct CoreVariant<T, true> { typedef typename CoreThreadType<T>::Type Type; };
+
+	/** 
+	 * Allows a simple way to define a member that can be both CoreObject variants depending on the Core template 
+	 * parameter. 
+	 */
+	template<class T, bool Core>
+	using CoreVariantType = typename CoreVariant<T, Core>::Type;
+
+	template<class T, bool Core>
+	struct CoreVariantHandle { };
+
+	template<class T>
+	struct CoreVariantHandle<T, false> { typedef ResourceHandle<T> Type; };
+
+	template<class T> struct CoreVariantHandle<T, true> { typedef SPtr<typename CoreThreadType<T>::Type> Type; };
+
+	/** 
+	 * Allows a simple way to define a member that can be both CoreObject variants depending on the Core template 
+	 * parameter. Sim thread type is wrapped in as a resource handle while the core thread variant is wrapped in a shared 
+	 * pointer. 
+	 */
+	template<class T, bool Core>
+	using CoreVariantHandleType = typename CoreVariantHandle<T, Core>::Type;
+
+	/** Flags that are provided to the serialization system to control serialization/deserialization. */
+	enum SerializationFlags
+	{
+		/** 
+		 * Used when deserializing resources. Lets the system know not to discard any intermediate resource data that might
+		 * be required if the resource needs to be serialized.
+		 */
+		SF_KeepResourceSourceData
+	};
+
+	/** Helper type that can contain either a component or scene actor version of an object. */
+	template<class T>
+	struct ComponentOrActor
+	{
+		using ComponentType = typename ComponentType<T>::Type;
+		using HandleType = GameObjectHandle<ComponentType>;
+
+		ComponentOrActor() = default;
+
+		ComponentOrActor(const GameObjectHandle<ComponentType>& component)
+			:mComponent(component)
+		{ }
+
+		ComponentOrActor(const SPtr<T>& actor)
+			:mActor(actor)
+		{ }
+
+		/** Returns true if both the component and the actor fields are not assigned. */
+		bool empty() const
+		{
+			return !mActor && !mComponent;
+		}
+
+		/** Returns the assigned value as a scene actor. */
+		SPtr<T> getActor() const
+		{
+			if(mActor)
+				return mActor;
+
+			return mComponent->_getInternal();
+		}
+
+		/** Returns the assigned value as a component. */
+		HandleType getComponent() const
+		{
+			return mComponent;
+		}
+
+	private:
+		GameObjectHandle<ComponentType> mComponent;
+		SPtr<T> mActor;
+	};
 }
 
 #include "Utility/BsCommonTypes.h"

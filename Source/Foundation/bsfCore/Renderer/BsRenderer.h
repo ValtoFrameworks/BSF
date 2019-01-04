@@ -13,19 +13,20 @@ namespace bs
 	class LightProbeVolume;
 	struct RenderSettings;
 	struct EvaluatedAnimationData;
-	struct ParticleSimulationData;
+	struct ParticlePerFrameData;
 
 	/** Contains various data evaluated by external systems on a per-frame basis that is to be used by the renderer. */
 	struct PerFrameData
 	{
 		const EvaluatedAnimationData* animation = nullptr;
-		const ParticleSimulationData* particles = nullptr;
+		const ParticlePerFrameData* particles = nullptr;
 	};
 
 	namespace ct
 	{
 	class RendererTask;
 	class LightProbeVolume;
+	class Decal;
 
 	/** @addtogroup Renderer-Internal
 	 *  @{
@@ -38,7 +39,7 @@ namespace bs
 	static const ShaderVariation& getVertexInputVariation()
 	{
 		static ShaderVariation variation = ShaderVariation(
-		Vector<ShaderVariation::Param>{
+		{
 			ShaderVariation::Param("SKINNED", skinned),
 			ShaderVariation::Param("MORPH", morph),
 		});
@@ -51,7 +52,7 @@ namespace bs
 	static const ShaderVariation& getForwardRenderingVariation()
 	{
 		static ShaderVariation variation = ShaderVariation(
-		Vector<ShaderVariation::Param>{
+		{
 			ShaderVariation::Param("SKINNED", skinned),
 			ShaderVariation::Param("MORPH", morph),
 			ShaderVariation::Param("CLUSTERED", clustered),
@@ -68,7 +69,7 @@ namespace bs
 	/**	Set of options that can be used for controlling the renderer. */	
 	struct BS_CORE_EXPORT RendererOptions
 	{
-		virtual ~RendererOptions() { }
+		virtual ~RendererOptions() = default;
 	};
 
 	/** Settings that control renderer scene capture. */
@@ -131,7 +132,7 @@ namespace bs
 	{
 	public:
 		Renderer();
-		virtual ~Renderer() { }
+		virtual ~Renderer() = default;
 
 		/** Initializes the renderer. Must be called before using the renderer. */
 		virtual void initialize() { }
@@ -290,6 +291,27 @@ namespace bs
 		 * @note	Core thread.
 		 */
 		virtual void notifyParticleSystemRemoved(ParticleSystem* particleSystem) { }
+
+		/**
+		 * Called whenever a new decal is created.
+		 *
+		 * @note	Core thread.
+		 */
+		virtual void notifyDecalAdded(Decal* decal) { }
+
+		/**
+		 * Called whenever a decal is updated.
+		 *
+		 * @note	Core thread.
+		 */
+		virtual void notifyDecalUpdated(Decal* decal) { }
+
+		/**
+		 * Called whenever a decal is destroyed.
+		 *
+		 * @note	Core thread.
+		 */
+		virtual void notifyDecalRemoved(Decal* decal) { }
 
 		/** 
 		 * Captures the scene at the specified location into a cubemap. 

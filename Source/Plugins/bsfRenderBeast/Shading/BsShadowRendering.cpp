@@ -1068,7 +1068,7 @@ namespace bs { namespace ct
 				ShadowProjectParams shadowParams(*light, shadowMap, shadowOmniParamBuffer, perViewBuffer, gbuffer);
 
 				ShadowProjectOmniMat* mat = ShadowProjectOmniMat::getVariation(effectiveShadowQuality, viewerInsideVolume, 
-					viewProps.numSamples > 1);
+					viewProps.target.numSamples > 1);
 				mat->bind(shadowParams);
 
 				gRendererUtility().draw(gRendererUtility().getSphereStencil());
@@ -1197,7 +1197,8 @@ namespace bs { namespace ct
 				gShadowProjectParamsDef.gFace.set(shadowParamBuffer, (float)shadowMapFace);
 				ShadowProjectParams shadowParams(*light, shadowMap, shadowParamBuffer, perViewBuffer, gbuffer);
 
-				ShadowProjectMat* mat = ShadowProjectMat::getVariation(effectiveShadowQuality, isCSM, viewProps.numSamples > 1);
+				ShadowProjectMat* mat = ShadowProjectMat::getVariation(effectiveShadowQuality, isCSM, 
+					viewProps.target.numSamples > 1);
 				mat->bind(shadowParams);
 
 				if (!isCSM)
@@ -1666,7 +1667,7 @@ namespace bs { namespace ct
 			const RenderSettings& viewSettings = view.getRenderSettings();
 
 			if(!viewSettings.enableShadows)
-				fadePercents.push_back(0.0f);
+				fadePercents.add(0.0f);
 			else
 			{
 				// Approximation for screen space sphere radius: screenSize * 0.5 * cot(fov) * radius / Z, where FOV is the 
@@ -1679,8 +1680,8 @@ namespace bs { namespace ct
 				float viewScaleX = viewProps.projTransform[0][0];
 				float viewScaleY = viewProps.projTransform[1][1];
 
-				float screenScaleX = viewScaleX * viewProps.viewRect.width * 0.5f;
-				float screenScaleY = viewScaleY * viewProps.viewRect.height * 0.5f;
+				float screenScaleX = viewScaleX * viewProps.target.viewRect.width * 0.5f;
+				float screenScaleY = viewScaleY * viewProps.target.viewRect.height * 0.5f;
 
 				float screenScale = std::max(screenScaleX, screenScaleY);
 
@@ -1695,7 +1696,7 @@ namespace bs { namespace ct
 
 				// Determine if the shadow should fade out
 				float fadePercent = Math::invLerp(optimalMapSize, (float)MIN_SHADOW_MAP_SIZE, (float)SHADOW_MAP_FADE_SIZE);
-				fadePercents.push_back(fadePercent);
+				fadePercents.add(fadePercent);
 				maxFadePercent = std::max(maxFadePercent, fadePercent);
 			}
 		}

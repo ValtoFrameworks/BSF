@@ -173,7 +173,7 @@ namespace bs { namespace ct
 			if(mMetaData.overrideShader == shader)
 				return;
 
-			for(size_t i = 0; i < mMetaData.instances.size(); i++)
+			for(UINT32 i = 0; i < mMetaData.instances.size(); i++)
 			{
 				if (mMetaData.instances[i] != nullptr)
 					bs_delete(mMetaData.instances[i]);
@@ -192,9 +192,10 @@ namespace bs { namespace ct
 
 		/** 
 		 * Binds the materials and its parameters to the pipeline. This material will be used for rendering any subsequent
-		 * draw calls, or executing dispatch calls.
+		 * draw calls, or executing dispatch calls. If @p bindParams is false you need to call bindParams() separately
+		 * to bind material parameters (if any).
 		 */
-		void bind() const
+		void bind(bool bindParams = true) const
 		{
 			RenderAPI& rapi = RenderAPI::instance();
 
@@ -206,6 +207,14 @@ namespace bs { namespace ct
 			else
 				rapi.setComputePipeline(mComputePipeline);
 
+			if(bindParams)
+				rapi.setGpuParams(mParams);
+		}
+
+		/** Binds the material parameters to the pipeline. */
+		void bindParams() const
+		{
+			RenderAPI& rapi = RenderAPI::instance();
 			rapi.setGpuParams(mParams);
 		}
 

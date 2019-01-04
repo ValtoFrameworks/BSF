@@ -19,7 +19,7 @@ namespace bs
 	{
 	public:
 		TechniqueBase(const String& language, const Vector<StringID>& tags, const ShaderVariation& variation);
-		virtual ~TechniqueBase() { }
+		virtual ~TechniqueBase() = default;
 
 		/**	Checks if this technique is supported based on current render and other systems. */
 		bool isSupported() const;
@@ -39,25 +39,17 @@ namespace bs
 		ShaderVariation mVariation;
 	};
 
-	template<bool Core> struct TPassType { };
-	template<> struct TPassType < false > { typedef Pass Type; };
-	template<> struct TPassType < true > { typedef ct::Pass Type; };
-
-	template<bool Core> struct TTechniqueType {};
-	template<> struct TTechniqueType < false > { typedef Technique Type; };
-	template<> struct TTechniqueType < true > { typedef ct::Technique Type; };
-
 	/** Templated class that is used for implementing both sim and core versions of Technique. */
 	template<bool Core>
 	class BS_CORE_EXPORT TTechnique : public TechniqueBase
 	{
 	public:
-		typedef typename TPassType<Core>::Type PassType;
+		using PassType = CoreVariantType<Pass, Core>;
 		
 		TTechnique();
 		TTechnique(const String& language, const Vector<StringID>& tags, const ShaderVariation& variation, 
 			const Vector<SPtr<PassType>>& passes);
-		virtual ~TTechnique() { }
+		virtual ~TTechnique() = default;
 
 		/**	Returns a pass with the specified index. */
 		SPtr<PassType> getPass(UINT32 idx) const;

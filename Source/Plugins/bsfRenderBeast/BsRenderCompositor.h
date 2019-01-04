@@ -55,7 +55,7 @@ namespace ct
 	class RenderCompositorNode
 	{
 	public:
-		virtual ~RenderCompositorNode() { }
+		virtual ~RenderCompositorNode() = default;
 
 	protected:
 		friend class RenderCompositor;
@@ -203,17 +203,19 @@ namespace ct
 	 * Initializes the GBuffer textures and renders the base pass into the GBuffer. The base pass includes all the opaque
 	 * objects visible to the view.
 	 */
-	class RCNodeGBuffer : public RenderCompositorNode
+	class RCNodeBasePass : public RenderCompositorNode
 	{
 	public:
 		// Outputs
 		SPtr<PooledRenderTexture> albedoTex;
 		SPtr<PooledRenderTexture> normalTex;
 		SPtr<PooledRenderTexture> roughMetalTex;
+		SPtr<PooledRenderTexture> idTex;
 
 		SPtr<RenderTexture> renderTarget;
+		SPtr<RenderTexture> renderTargetNoMask;
 
-		static StringID getNodeId() { return "GBuffer"; }
+		static StringID getNodeId() { return "BasePass"; }
 		static SmallVector<StringID, 4> getDependencies(const RendererView& view);
 	protected:
 		/** @copydoc RenderCompositorNode::render */
@@ -267,6 +269,38 @@ namespace ct
 		SPtr<PooledRenderTexture> output;
 
 		static StringID getNodeId() { return "MSAACoverage"; }
+		static SmallVector<StringID, 4> getDependencies(const RendererView& view);
+	protected:
+		/** @copydoc RenderCompositorNode::render */
+		void render(const RenderCompositorNodeInputs& inputs) override;
+
+		/** @copydoc RenderCompositorNode::clear */
+		void clear() override;
+	};
+
+	/************************************************************************/
+	/* 							UTILITY NODES                     			*/
+	/************************************************************************/
+
+	/** Simulates GPU particle systems. */
+	class RCNodeParticleSimulate : public RenderCompositorNode
+	{
+	public:
+		static StringID getNodeId() { return "ParticleSimulate"; }
+		static SmallVector<StringID, 4> getDependencies(const RendererView& view);
+	protected:
+		/** @copydoc RenderCompositorNode::render */
+		void render(const RenderCompositorNodeInputs& inputs) override;
+
+		/** @copydoc RenderCompositorNode::clear */
+		void clear() override;
+	};
+
+	/** Performs view-based sorting on CPU simulated particle systems. */
+	class RCNodeParticleSort : public RenderCompositorNode
+	{
+	public:
+		static StringID getNodeId() { return "ParticleSort"; }
 		static SmallVector<StringID, 4> getDependencies(const RendererView& view);
 	protected:
 		/** @copydoc RenderCompositorNode::render */
@@ -383,8 +417,6 @@ namespace ct
 	class RCNodeClusteredForward : public RenderCompositorNode
 	{
 	public:
-		RCNodeClusteredForward();
-
 		static StringID getNodeId() { return "ClusteredForward"; }
 		static SmallVector<StringID, 4> getDependencies(const RendererView& view);
 	protected:
@@ -464,19 +496,15 @@ namespace ct
 		mutable UINT32 mCurrentIdx = 0;
 	};
 
-	/**
-	 * Performs tone mapping on the contents of the scene color texture. At the same time resolves MSAA into a non-MSAA
-	 * scene color texture.
-	 */
-	class RCNodeTonemapping : public RenderCompositorNode
+	/** Calculates the eye adaptation values used for automatic exposure. */
+	class RCNodeEyeAdaptation : public RenderCompositorNode
 	{
 	public:
-		SPtr<PooledRenderTexture> eyeAdaptation;
-		SPtr<PooledRenderTexture> prevEyeAdaptation;
+		SPtr<PooledRenderTexture> output;
 
-		~RCNodeTonemapping();
+		~RCNodeEyeAdaptation();
 
-		static StringID getNodeId() { return "Tonemapping"; }
+		static StringID getNodeId() { return "EyeAdaptation"; }
 		static SmallVector<StringID, 4> getDependencies(const RendererView& view);
 	protected:
 		/** @copydoc RenderCompositorNode::render */
@@ -490,6 +518,27 @@ namespace ct
 		 * should be used. 
 		 */
 		bool useHistogramEyeAdapatation(const RenderCompositorNodeInputs& inputs);
+
+		SPtr<PooledRenderTexture> previous;
+	};
+
+	/**
+	 * Performs tone mapping on the contents of the scene color texture. At the same time resolves MSAA into a non-MSAA
+	 * scene color texture.
+	 */
+	class RCNodeTonemapping : public RenderCompositorNode
+	{
+	public:
+		~RCNodeTonemapping();
+
+		static StringID getNodeId() { return "Tonemapping"; }
+		static SmallVector<StringID, 4> getDependencies(const RendererView& view);
+	protected:
+		/** @copydoc RenderCompositorNode::render */
+		void render(const RenderCompositorNodeInputs& inputs) override;
+
+		/** @copydoc RenderCompositorNode::clear */
+		void clear() override;
 
 		SPtr<PooledRenderTexture> mTonemapLUT;
 		UINT64 mTonemapLastUpdateHash = -1;
@@ -526,6 +575,22 @@ namespace ct
 	/************************************************************************/
 	/* 							SCREEN SPACE								*/
 	/************************************************************************/
+
+	/** Generates a 1/2 size of the scene color texture. If MSAA only the first sample is used. */
+	class RCNodeHalfSceneColor : public RenderCompositorNode
+	{
+	public:
+		SPtr<PooledRenderTexture> output;
+
+		static StringID getNodeId() { return "HalfSceneColor"; }
+		static SmallVector<StringID, 4> getDependencies(const RendererView& view);
+	protected:
+		/** @copydoc RenderCompositorNode::render */
+		void render(const RenderCompositorNodeInputs& inputs) override;
+
+		/** @copydoc RenderCompositorNode::clear */
+		void clear() override;
+	};
 
 	/** Resolves the depth buffer (if multi-sampled). Otherwise just references the original depth buffer. */
 	class RCNodeResolvedSceneDepth : public RenderCompositorNode
@@ -601,6 +666,24 @@ namespace ct
 
 		SPtr<PooledRenderTexture> mPooledOutput;
 		SPtr<PooledRenderTexture> mPrevFrame;
+	};
+
+	/** Renders the bloom effect. */
+	class RCNodeBloom : public RenderCompositorNode
+	{
+	public:
+		SPtr<Texture> output;
+
+		static StringID getNodeId() { return "Bloom"; }
+		static SmallVector<StringID, 4> getDependencies(const RendererView& view);
+	protected:
+		/** @copydoc RenderCompositorNode::render */
+		void render(const RenderCompositorNodeInputs& inputs) override;
+
+		/** @copydoc RenderCompositorNode::clear */
+		void clear() override;
+
+		SPtr<PooledRenderTexture> mPooledOutput;
 	};
 
 	/** @} */

@@ -35,12 +35,12 @@ namespace bs
 	template<bool Core>
 	class BS_CORE_EXPORT TRenderable : public SceneActor
 	{
-		typedef typename TMeshType<Core>::Type MeshType;
-		typedef typename TMaterialPtrType<Core>::Type MaterialType;
+		using MeshType = CoreVariantHandleType<Mesh, Core>;
+		using MaterialType = CoreVariantHandleType<Material, Core>;
 
 	public:
 		TRenderable();
-		virtual ~TRenderable();
+		virtual ~TRenderable() = default;
 
 		/** @copydoc bs::SceneActor::setTransform */
 		void setTransform(const Transform& transform) override;
@@ -129,12 +129,12 @@ namespace bs
 
 		MeshType mMesh;
 		Vector<MaterialType> mMaterials;
-		UINT64 mLayer;
+		UINT64 mLayer = 1;
 		AABox mOverrideBounds;
-		bool mUseOverrideBounds;
-		Matrix4 mTfrmMatrix;
-		Matrix4 mTfrmMatrixNoScale;
-		RenderableAnimType mAnimType;
+		bool mUseOverrideBounds = false;
+		Matrix4 mTfrmMatrix = BsIdentity;
+		Matrix4 mTfrmMatrixNoScale = BsIdentity;
+		RenderableAnimType mAnimType = RenderableAnimType::None;
 	};
 
 	/** @} */

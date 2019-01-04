@@ -35,16 +35,11 @@ namespace bs
 	 *  @{
 	 */
 
-	/**
-	 * Camera determines how is world geometry projected onto a 2D surface. You may position and orient it in space, set
-	 * options like aspect ratio and field or view and it outputs view and projection matrices required for rendering.
-	 *
-	 * @note	This class contains funcionality common to both core and non-core versions of the camera.
-	 */
+	/** Common base class for both sim and core thread implementations of Camera. */
 	class BS_CORE_EXPORT CameraBase : public SceneActor
 	{
 	public:
-		virtual ~CameraBase() { }
+		virtual ~CameraBase() = default;
 
 		/** @copydoc SceneActor::setTransform */
 		void setTransform(const Transform& transform) override;
@@ -408,30 +403,31 @@ namespace bs
 		virtual Rect2I getViewportRect() const = 0;
 
 	protected:
-		UINT64 mLayers; /**< Bitfield that can be used for filtering what objects the camera sees. */
+		UINT64 mLayers = 0xFFFFFFFFFFFFFFFF; /**< Bitfield that can be used for filtering what objects the camera sees. */
 
-		ProjectionType mProjType; /**< Type of camera projection. */
-		Radian mHorzFOV; /**< Horizontal field of view represents how wide is the camera angle. */
-		float mFarDist; /**< Clip any objects further than this. Larger value decreases depth precision at smaller depths. */
-		float mNearDist; /**< Clip any objects close than this. Smaller value decreases depth precision at larger depths. */
-		float mAspect; /**< Width/height viewport ratio. */
-		float mOrthoHeight; /**< Height in world units used for orthographic cameras. */
-		INT32 mPriority; /**< Determines in what order will the camera be rendered. Higher priority means the camera will be rendered sooner. */
+		ProjectionType mProjType = PT_PERSPECTIVE; /**< Type of camera projection. */
+		Radian mHorzFOV = Degree(90.0f); /**< Horizontal field of view represents how wide is the camera angle. */
+		float mFarDist = 500.0f; /**< Clip any objects further than this. Larger value decreases depth precision at smaller depths. */
+		float mNearDist = 0.05f; /**< Clip any objects close than this. Smaller value decreases depth precision at larger depths. */
+		float mAspect = 1.33333333333333f; /**< Width/height viewport ratio. */
+		float mOrthoHeight = 5; /**< Height in world units used for orthographic cameras. */
+		INT32 mPriority = 0; /**< Determines in what order will the camera be rendered. Higher priority means the camera will be rendered sooner. */
+		bool mMain = false; /**< Determines does this camera render to the main render surface. */
 
-		bool mCustomViewMatrix; /**< Is custom view matrix set. */
-		bool mCustomProjMatrix; /**< Is custom projection matrix set. */
-		UINT8 mMSAA; /**< Number of samples to render the scene with. */
+		bool mCustomViewMatrix = false; /**< Is custom view matrix set. */
+		bool mCustomProjMatrix = false; /**< Is custom projection matrix set. */
+		UINT8 mMSAA = 1; /**< Number of samples to render the scene with. */
 
 		SPtr<RenderSettings> mRenderSettings; /**< Settings used to control rendering for this camera. */
 
-		bool mFrustumExtentsManuallySet; /**< Are frustum extents manually set. */
+		bool mFrustumExtentsManuallySet = false; /**< Are frustum extents manually set. */
 
-		mutable Matrix4 mProjMatrixRS; /**< Cached render-system specific projection matrix. */
-		mutable Matrix4 mProjMatrix; /**< Cached projection matrix that determines how are 3D points projected to a 2D viewport. */
-		mutable Matrix4 mViewMatrix; /**< Cached view matrix that determines camera position/orientation. */
-		mutable Matrix4 mProjMatrixRSInv;
-		mutable Matrix4 mProjMatrixInv;
-		mutable Matrix4 mViewMatrixInv;
+		mutable Matrix4 mProjMatrixRS = BsZero; /**< Cached render-system specific projection matrix. */
+		mutable Matrix4 mProjMatrix = BsZero; /**< Cached projection matrix that determines how are 3D points projected to a 2D viewport. */
+		mutable Matrix4 mViewMatrix = BsZero; /**< Cached view matrix that determines camera position/orientation. */
+		mutable Matrix4 mProjMatrixRSInv = BsZero;
+		mutable Matrix4 mProjMatrixInv = BsZero;
+		mutable Matrix4 mViewMatrixInv = BsZero;
 
 		mutable ConvexVolume mFrustum; /**< Main clipping planes describing cameras visible area. */
 		mutable bool mRecalcFrustum : 1; /**< Should frustum be recalculated. */
@@ -439,7 +435,28 @@ namespace bs
 		mutable bool mRecalcView : 1; /**< Should view matrix be recalculated. */
 		mutable float mLeft, mRight, mTop, mBottom; /**< Frustum extents. */
 		mutable AABox mBoundingBox; /**< Frustum bounding box. */
-	 };
+	};
+
+	/** Templated common base class for both sim and core thread implementations of Camera. */
+	template<bool Core>
+	class TCamera : public CameraBase
+	{
+		using ViewportType = CoreVariantType<Viewport, Core>;
+
+	public:
+		virtual ~TCamera() = default;
+
+		/**	Returns the viewport used by the camera. */	
+		SPtr<ViewportType> getViewport() const { return mViewport; }
+
+		/** Enumerates all the fields in the type and executes the specified processor action for each field. */
+		template<class P>
+		void rttiEnumFields(P p);
+
+	protected:
+		/** Viewport that describes a 2D rendering surface. */
+		SPtr<ViewportType> mViewport;
+	};
 
 	/** @} */
 
@@ -447,18 +464,18 @@ namespace bs
 	 *  @{
 	 */
 
-	/** @copydoc CameraBase */
-	class BS_CORE_EXPORT Camera : public IReflectable, public CoreObject, public CameraBase
+	/**
+	 * Camera determines how is world geometry projected onto a 2D surface. You may position and orient it in space, set
+	 * options like aspect ratio and field or view and it outputs view and projection matrices required for rendering.
+	 */
+	class BS_CORE_EXPORT Camera : public IReflectable, public CoreObject, public TCamera<false>
 	{
 	public:
-		/**	Returns the viewport used by the camera. */	
-		SPtr<Viewport> getViewport() const { return mViewport; }
-
 		/**
 		 * Determines whether this is the main application camera. Main camera controls the final render surface that is
 		 * displayed to the user.
 		 */	
-		void setMain(bool main) { mMain = main; }
+		void setMain(bool main);
 
 		/** @copydoc setMain() */
 		bool isMain() const { return mMain; }
@@ -482,8 +499,6 @@ namespace bs
 
 		/** @} */
 	protected:
-		Camera();
-
 		/** @copydoc CameraBase */
 		Rect2I getViewportRect() const override;
 
@@ -502,9 +517,6 @@ namespace bs
 		/**	Creates a new camera without initializing it. */
 		static SPtr<Camera> createEmpty();
 
-		SPtr<Viewport> mViewport; /**< Viewport that describes 2D rendering surface. */
-		bool mMain;
-
 		/************************************************************************/
 		/* 								RTTI		                     		*/
 		/************************************************************************/
@@ -516,14 +528,14 @@ namespace bs
 
 	namespace ct
 	{
-	/** @copydoc CameraBase */
-	class BS_CORE_EXPORT Camera : public CoreObject, public CameraBase
+	/** @copydoc bs::Camera */
+	class BS_CORE_EXPORT Camera : public CoreObject, public TCamera<true>
 	{
 	public:
 		~Camera();
 
-		/**	Returns the viewport used by the camera. */	
-		SPtr<Viewport> getViewport() const { return mViewport; }
+		/** @copydoc bs::Camera::setMain() */
+		bool isMain() const { return mMain; }
 
 		/**	Sets an ID that can be used for uniquely identifying this object by the renderer. */
 		void setRendererId(UINT32 id) { mRendererId = id; }
@@ -549,7 +561,6 @@ namespace bs
 		void syncToCore(const CoreSyncData& data) override;
 
 		UINT32 mRendererId;
-		SPtr<Viewport> mViewport;
 	};
 	}
 

@@ -16,6 +16,7 @@ namespace bs
 		mTimer = bs_new<Timer>();
 		mAppStartTime = mTimer->getStartMs();
 		mLastFrameTime = mTimer->getMicroseconds();
+		mAppStartUpDate = std::time(nullptr);
 	}
 
 	Time::~Time()
@@ -27,7 +28,14 @@ namespace bs
 	{
 		UINT64 currentFrameTime = mTimer->getMicroseconds();
 
-		mFrameDelta = (float)((currentFrameTime - mLastFrameTime) * MICROSEC_TO_SEC);
+		if(!mFirstFrame)
+			mFrameDelta = (float)((currentFrameTime - mLastFrameTime) * MICROSEC_TO_SEC);
+		else
+		{
+			mFrameDelta = 0.0f;
+			mFirstFrame = false;
+		}
+
 		mTimeSinceStartMs = (UINT64)(currentFrameTime / 1000);
 		mTimeSinceStart = mTimeSinceStartMs / 1000.0f;
 		
@@ -41,10 +49,10 @@ namespace bs
 		const UINT64 currentTime = getTimePrecise();
 
 		// Skip fixed update first frame (time delta is zero, and no input received yet)
-		if (mFirstFrame)
+		if (mFirstFixedFrame)
 		{
 			mLastFixedUpdateTime = currentTime;
-			mFirstFrame = false;
+			mFirstFixedFrame = false;
 		}
 
 		const UINT64 nextFrameTime = mLastFixedUpdateTime + mFixedStep;
@@ -78,6 +86,38 @@ namespace bs
 	UINT64 Time::getTimePrecise() const
 	{
 		return mTimer->getMicroseconds();
+	}
+
+	String Time::getCurrentDateTime(bool isUTC)
+	{
+		std::time_t t = std::time(nullptr);
+		char out[100];
+		if (isUTC)
+			std::strftime(out, sizeof(out), "%A, %B %d, %Y %T", std::gmtime(&t));
+		else
+			std::strftime(out, sizeof(out), "%A, %B %d, %Y %T", std::localtime(&t));
+		return String(out);
+	}
+
+	String Time::getCurrentTime(bool isUTC)
+	{
+		std::time_t t = std::time(nullptr);
+		char out[15];
+		if (isUTC)
+			std::strftime(out, sizeof(out), "%T", std::gmtime(&t));
+		else
+			std::strftime(out, sizeof(out), "%T", std::localtime(&t));
+		return String(out);
+	}
+
+	String Time::getAppStartUpDate(bool isUTC)
+	{
+		char out[100];
+		if (isUTC)
+			std::strftime(out, sizeof(out), "%A, %B %d, %Y %T", std::gmtime(&mAppStartUpDate));
+		else
+			std::strftime(out, sizeof(out), "%A, %B %d, %Y %T", std::localtime(&mAppStartUpDate));
+		return String(out);
 	}
 
 	Time& gTime()

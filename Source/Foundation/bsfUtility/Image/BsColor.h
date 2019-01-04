@@ -28,8 +28,10 @@ namespace bs
 		static const Color Red;
 		static const Color Green;
 		static const Color Blue;
+		static const Color LightGray;
+		static const Color BansheeOrange;
 
-		explicit Color(float red = 1.0f, float green = 1.0f, float blue = 1.0f, float alpha = 1.0f ) 
+		constexpr explicit Color(float red = 1.0f, float green = 1.0f, float blue = 1.0f, float alpha = 1.0f ) 
 			:r(red), g(green), b(blue), a(alpha)
 		{ }
 
@@ -48,17 +50,14 @@ namespace bs
 		/** Returns the color as a 32-bit value in ABGR order. */
 		ABGR getAsABGR() const;
 
-		/** Assigns the color from a 32-bit value that encodes a RGBA color. */
-		void setAsRGBA(RGBA val);
-
-		/** Assigns the color from a 32-bit value that encodes a ARGB color. */
-		void setAsARGB(ARGB val);
-
-		/** Assigns the color from a 32-bit value that encodes a BGRA color. */
-		void setAsBGRA(BGRA val);
-
-		/** Assigns the color from a 32-bit value that encodes a ABGR color. */
-		void setAsABGR(ABGR val);
+		/** 
+		 * Convert the current color to hue, saturation and brightness values. 
+		 * 
+		 * @param[in] hue			Output hue value, scaled to the [0,1] range.
+		 * @param[in] saturation	Output saturation level, [0,1].
+		 * @param[in] brightness	Output brightness level, [0,1].
+		 */
+		void getHSB(float* hue, float* saturation, float* brightness) const;
 
 		/** Clamps color value to the range [0, 1]. */
 		void saturate()
@@ -120,89 +119,40 @@ namespace bs
 
 		Color operator+ (const Color& rhs) const
 		{
-			Color sum;
-
-			sum.r = r + rhs.r;
-			sum.g = g + rhs.g;
-			sum.b = b + rhs.b;
-			sum.a = a + rhs.a;
-
-			return sum;
+			return Color(r + rhs.r, g + rhs.g, b + rhs.b, a + rhs.a);
 		}
 
 		Color operator- (const Color& rhs) const
 		{
-			Color diff;
-
-			diff.r = r - rhs.r;
-			diff.g = g - rhs.g;
-			diff.b = b - rhs.b;
-			diff.a = a - rhs.a;
-
-			return diff;
+			return Color(r - rhs.r, g - rhs.g, b - rhs.b, a - rhs.a);
 		}
 
 		Color operator* (float rhs) const
 		{
-			Color prod;
-
-			prod.r = rhs*r;
-			prod.g = rhs*g;
-			prod.b = rhs*b;
-			prod.a = rhs*a;
-
-			return prod;
+			return Color(rhs * r, rhs * g, rhs * b, rhs * a);
 		}
 
 		Color operator* (const Color& rhs) const
 		{
-			Color prod;
-
-			prod.r = rhs.r * r;
-			prod.g = rhs.g * g;
-			prod.b = rhs.b * b;
-			prod.a = rhs.a * a;
-
-			return prod;
+			return Color(rhs.r * r, rhs.g * g, rhs.b * b, rhs.a * a);
 		}
 
 		Color operator/ (const Color& rhs) const
 		{
-			Color prod;
-
-			prod.r = rhs.r / r;
-			prod.g = rhs.g / g;
-			prod.b = rhs.b / b;
-			prod.a = rhs.a / a;
-
-			return prod;
+			return Color(r / rhs.r, g / rhs.g, b / rhs.b, a / rhs.a);
 		}
 
 		Color operator/ (float rhs) const
 		{
 			assert(rhs != 0.0f);
-
-			Color div;
-
 			float invRhs = 1.0f / rhs;
-			div.r = r * invRhs;
-			div.g = g * invRhs;
-			div.b = b * invRhs;
-			div.a = a * invRhs;
 
-			return div;
+			return Color(r * invRhs, g * invRhs, b * invRhs, a * invRhs);
 		}
 
 		friend Color operator* (float lhs, const Color& rhs)
 		{
-			Color result;
-
-			result.r = lhs * rhs.r;
-			result.g = lhs * rhs.g;
-			result.b = lhs * rhs.b;
-			result.a = lhs * rhs.a;
-
-			return result;
+			return Color(lhs * rhs.r, lhs * rhs.g, lhs * rhs.b, lhs * rhs.a);
 		}
 
 		Color& operator+= (const Color& rhs)
@@ -249,23 +199,26 @@ namespace bs
 			return *this;
 		}
 
+		/** Creates a color value from a 32-bit value that encodes a RGBA color. */
+		static Color fromRGBA(RGBA val);
+
+		/** Creates a color value from a 32-bit value that encodes a ARGB color. */
+		static Color fromARGB(ARGB val);
+
+		/** Creates a color value from a 32-bit value that encodes a BGRA color. */
+		static Color fromBGRA(BGRA val);
+
+		/** Creates a color value from a 32-bit value that encodes a ABGR color. */
+		static Color fromABGR(ABGR val);
+
 		/** 
-		 * Set a color value from hue, saturation and brightness.
+		 * Creates a color value from hue, saturation and brightness.
 		 *
 		 * @param[in] hue			Hue value, scaled to the [0,1] range.
 		 * @param[in] saturation	Saturation level, [0,1].
 		 * @param[in] brightness	Brightness level, [0,1].
 		 */
-		void setHSB(float hue, float saturation, float brightness);
-
-		/** 
-		 * Convert the current color to hue, saturation and brightness values. 
-		 * 
-		 * @param[in] hue			Output hue value, scaled to the [0,1] range.
-		 * @param[in] saturation	Output saturation level, [0,1].
-		 * @param[in] brightness	Output brightness level, [0,1].
-		 */
-		void getHSB(float* hue, float* saturation, float* brightness) const;
+		static Color fromHSB(float hue, float saturation, float brightness);
 
 		/**
 		 * Linearly interpolates between the two colors using @p t. t should be in [0, 1] range, where t = 0 corresponds

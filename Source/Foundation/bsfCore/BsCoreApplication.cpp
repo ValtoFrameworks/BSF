@@ -21,7 +21,6 @@
 #include "Renderer/BsRendererManager.h"
 #include "Managers/BsGpuProgramManager.h"
 #include "Managers/BsMeshManager.h"
-#include "Material/BsMaterialManager.h"
 #include "Managers/BsRenderWindowManager.h"
 #include "Renderer/BsRenderer.h"
 #include "Utility/BsDeferredCallManager.h"
@@ -45,6 +44,7 @@
 #include "Animation/BsAnimationManager.h"
 #include "Renderer/BsParamBlocks.h"
 #include "Particles/BsParticleManager.h"
+#include "Particles/BsVectorField.h"
 
 namespace bs
 {
@@ -62,7 +62,6 @@ namespace bs
 		mPrimaryWindow = nullptr;
 
 		Importer::shutDown();
-		MaterialManager::shutDown();
 		MeshManager::shutDown();
 		ProfilerGPU::shutDown();
 
@@ -164,7 +163,6 @@ namespace bs
 
 		ProfilerGPU::startUp();
 		MeshManager::startUp();
-		MaterialManager::startUp();
 		Importer::startUp();
 		AudioManager::startUp(mStartUpDesc.audio);
 		PhysicsManager::startUp(mStartUpDesc.physics, isEditor());
@@ -173,6 +171,10 @@ namespace bs
 
 		for (auto& importerName : mStartUpDesc.importers)
 			loadPlugin(importerName);
+
+		// Built-in importers
+		FGAImporter* fgaImporter = bs_new<FGAImporter>();
+		Importer::instance()._registerAssetImporter(fgaImporter);
 	}
 
 	void CoreApplication::runMainLoop()
@@ -233,8 +235,9 @@ namespace bs
 				const float stepSeconds = step / 1000000.0f;
 				for (UINT32 i = 0; i < numIterations; i++)
 				{
+					fixedUpdate();
 					PROFILE_CALL(gSceneManager()._fixedUpdate(), "Scene fixed update");
-					gPhysics().fixedUpdate(stepSeconds);
+					PROFILE_CALL(gPhysics().fixedUpdate(stepSeconds), "Physics simulation");
 
 					gTime()._advanceFixedUpdate(step);
 				}
@@ -321,6 +324,11 @@ namespace bs
 	void CoreApplication::postUpdate()
 	{
 		// Do nothing
+	}
+
+	void CoreApplication::fixedUpdate()
+	{
+	   // Do nothing
 	}
 
 	void CoreApplication::stopMainLoop()

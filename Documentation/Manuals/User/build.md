@@ -4,7 +4,7 @@ Setting up a project				{#build}
 
 This manual will explain how to set up your own project and link it with bs::framework. We'll explore two options:
  - **Link with binaries** - Either download the precompiled set of binaries or compile them yourself. Then create a project that links with the binaries. If you do not wish to compile `bsf` yourself, this is the best approach to follow.
- - **Link with source** - Grab the source code and include it as part of your own project. Requires you to go through the same steps as if you were compiling `bsf` from scratch, but allows you to easily recompile the framework from latest source, or due to your own modifications. If you plan on making changes to the framework, or want to frequently update to the latest version, this is the best approach.
+ - **Link with source** - Grab the source code and include it as part of your own project. Requires you to go through the same steps as if you were compiling `bsf` from scratch, but allows you to easily recompile the framework from latest source, or due to your own modifications. If you plan on making changes to the framework, or want to frequently update to the latest version, this is the best approach. Linux users should also prefer this approach as binary incompatibilities between different Linux distributions might make the provided binaries incompatible with your particular distribution.
 
 # Link with binaries {#build_a}
  
@@ -17,14 +17,15 @@ Whether you downloaded precompiled binaries or compiled them yourself you should
  - `include` - Contains public header files
  - `lib` - Contains shared and import libraries
  
-For precompiled dependencies these folders will be part of the downloaded archive, and for manually compiled option they will be placed in the chosen `install` folder.
+If you downloaded a precompiled package these folders will be part of the downloaded archive.
+If you manually compiled they will be placed in the chosen `install` folder after you run the install step (as described by the compilation guide on the GitHub page).
 
 In order to get your project running you will need to:
  - Provide a path to the bsf's include folder to your compiler
  - Link with the `bsf` dynamic/shared library
  - Make sure your executable can find all the dynamic libraries and data files
 
-We'll use CMake to create a project that will ultimately work with any major build tool (like Visual Studio, XCode or Makefiles).
+We'll handle these steps by creating a CMake project that will ultimately work with any major build tool (like Visual Studio, XCode or Makefiles).
  
 ## CMake {#build_a_a}
 CMake is a build system that allows you define a project that can then be used for building across multiple platforms and build tools. Such CMake project can be used to create a Visual Studio solution, XCode project or Unix Makefiles. `bsf` also comes with modules that make using `bsf` in your CMake project easier.
@@ -38,7 +39,7 @@ First create a new directory where you would like your project to live. Grab the
 In your project folder create `CMakeLists.txt`, and fill it out like so:
 ```
 # Minimum version of CMake as required by bsf
-cmake_minimum_required (VERSION 3.9.0)
+cmake_minimum_required (VERSION 3.12.0)
 
 # Name of your project
 project (myProject)
@@ -69,6 +70,8 @@ find_package(bsf REQUIRED)
 target_link_libraries(myApp PRIVATE bsf)
 ```
 
+Make sure to modify `C:/path/to/bsf/install` and set it to the path where you extracted/installed `bsf`.
+
 ## Code {#build_a_d}
 The CMake file above references `Main.cpp` file. The most basic file that runs the framework looks like so:
 ```
@@ -92,14 +95,14 @@ We will explain the code above in following manuals, but for now you can just co
 Place the `Main.cpp` into your project's root folder.
 
 ## Get CMake {#build_a_e}
-If you don't already have it, grab the latest version of CMake from [www.cmake.org](https://cmake.org/download/). Make sure to grab version 3.9.0 or later. 
+If you don't already have it, grab the latest version of CMake from [www.cmake.org](https://cmake.org/download/). Make sure to grab version 3.12.4 or later. 
 
 ## Build {#build_a_f}
 You are now ready to build the project. From your project's root folder execute the following commands in terminal/command line:
  - `mkdir build`
  - `cd build`
  - `cmake -G "$generator" ..`
-   - Where *$generator$* should be replaced with any of the supported generators. Some common ones:
+   - Where *$generator* should be replaced with any of the supported generators. Some common ones:
      - `Visual Studio 15 2017 Win64` - Visual Studio 2017 (64-bit build)
 	 - `Unix Makefiles`
 	 - `Ninja`
@@ -117,7 +120,7 @@ Before you can run the application you must first copy the data files and dynami
  - Copy the `bin/Data` folder to the location where is your executable is located
  - If on Windows you should also copy any .dll files in the `bin` folder to where your executable is located. Note that precompiled binaries package comes with separate set of dynamic libraries for Debug and Release builds in `bin/Debug` and `bin/Release` folders. You should copy them to the appropriate folder depending on the configuration you are building with. 
  
-For example in Visual Studio the executable will be placed at `x64/Release/` within your project root, for a 64-bit Release configuration. This is where you should place the dynamic libraries and the data files.
+For example in Visual Studio the executable will be placed at `Release/` folder within your project root, for a Release configuration. This is where you should place the dynamic libraries and the data files.
 
 ![Structure of the executable folder on Windows](BuildStructure.png)
 
@@ -134,7 +137,7 @@ First make sure to follow the compilation guide on [GitHub](https://github.com/G
 Create a new project folder, with a `CMakeLists.txt` file with the following contents:
 ```
 # Minimum version of CMake as required by bsf
-cmake_minimum_required (VERSION 3.9.0)
+cmake_minimum_required (VERSION 3.12.0)
 
 # Name of your project
 project (myProject)
@@ -160,6 +163,8 @@ add_dependencies(myApp bsfFBXImporter bsfFontImporter bsfFreeImgImporter)
 # When 'myApp' target is built, copy required binaries from bsf
 copyBsfBinaries(myApp ${BSF_DIRECTORY})
 ```
+
+Make sure to set `C:/bsf` to the directory where you cloned `bsf`.
 
 ## Code {#build_b_c}
 The CMake file above references `Main.cpp` file. The most basic file that runs the framework looks like so:
@@ -201,6 +206,6 @@ Your build files will be output to the `build` folder.
  - If you are using XCode open up the project in the `build` folder and proceed building as normal
  - If you are using Makefiles simply run `make` within the `build` folder
  
-After building any executables/dynamic libraries will be placed in the `bin` sub-folder in your project root, and any static/shared libraries will be placed in the `lib` sub-folder.
+After building any executables/dynamic libraries will be placed in the `bin` sub-folder in your `build` folder, and any static/shared libraries will be placed in the `lib` sub-folder.
 
 Unlike with **Link with binaries** approach you do not need to do any file copying, until you are ready to send the application to your users. After the build the application is ready to run.

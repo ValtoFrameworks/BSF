@@ -16,11 +16,14 @@ namespace bs
 	class BS_CORE_EXPORT ShaderImportOptionsRTTI : public RTTIType<ShaderImportOptions, ImportOptions, ShaderImportOptionsRTTI>
 	{
 	private:
+		BS_BEGIN_RTTI_MEMBERS
+			BS_RTTI_MEMBER_PLAIN(mLanguages, 1)
+		BS_END_RTTI_MEMBERS
+
 		std::pair<String, String>& getDefinePair(ShaderImportOptions* obj, UINT32 idx)
 		{
 			return mDefinePairs[idx];
 		}
-
 
 		void setDefinePair(ShaderImportOptions* obj, UINT32 idx, std::pair<String, String>& val)
 		{
@@ -39,7 +42,7 @@ namespace bs
 		}
 
 		/** @copydoc ShaderImportOptionsRTTI::onSerializationStarted */
-		void onSerializationStarted(IReflectable* obj, const UnorderedMap<String, UINT64>& params) override
+		void onSerializationStarted(IReflectable* obj, SerializationContext* context) override
 		{
 			ShaderImportOptions* importOptions = static_cast<ShaderImportOptions*>(obj);
 

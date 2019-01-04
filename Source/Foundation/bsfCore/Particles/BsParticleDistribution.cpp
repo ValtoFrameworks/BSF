@@ -19,6 +19,13 @@ namespace bs
 	}
 
 	template <>
+	void addToVector(const Vector2& val, Vector<float>& output)
+	{
+		output.push_back(val.x);
+		output.push_back(val.y);
+	}
+
+	template <>
 	void addToVector(const Color& val, Vector<float>& output)
 	{
 		output.push_back(val.r);
@@ -43,15 +50,10 @@ namespace bs
 		case PDT_Constant:
 		case PDT_RandomRange:
 		{
-			Color value;
-			value.setAsRGBA(mMinColor);
-			addToVector(value, values);
+			addToVector(getMinConstant(), values);
 
 			if(useRange)
-			{
-				value.setAsRGBA(mMaxColor);
-				addToVector(value, values);
-			}
+				addToVector(getMaxConstant(), values);
 		}
 			break;
 		case PDT_Curve:
@@ -75,16 +77,10 @@ namespace bs
 				float t = minT;
 				for(UINT32 i = 0; i < numSamples; i++)
 				{
-					Color value;
-					value.setAsRGBA(mMinGradient.evaluate(t));
-
-					addToVector(value, values);
+					addToVector(Color::fromRGBA(mMinGradient.evaluate(t)), values);
 
 					if(useRange)
-					{
-						value.setAsRGBA(mMaxGradient.evaluate(t));
-						addToVector(value, values);
-					}
+						addToVector(Color::fromRGBA(mMaxGradient.evaluate(t)), values);
 					
 					t += sampleInterval;
 				}
@@ -110,10 +106,10 @@ namespace bs
 		default:
 		case PDT_Constant:
 		case PDT_RandomRange:
-			addToVector(mMinValue, values);
+			addToVector(getMinConstant(), values);
 
 			if(useRange)
-				addToVector(mMaxValue, values);
+				addToVector(getMaxConstant(), values);
 			break;
 		case PDT_Curve:
 		case PDT_RandomCurveRange:
@@ -152,4 +148,8 @@ namespace bs
 
 		return LookupTable(std::move(values), minT, maxT, sizeof(T) / sizeof(float));
 	}
+
+	template struct BS_CORE_EXPORT TDistribution<float>;
+	template struct BS_CORE_EXPORT TDistribution<Vector3>;
+	template struct BS_CORE_EXPORT TDistribution<Vector2>;
 }

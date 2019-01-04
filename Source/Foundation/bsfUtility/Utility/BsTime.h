@@ -80,6 +80,46 @@ namespace bs
 		 */
 		UINT64 getStartTimeMs() const { return mAppStartTime; }
 
+		/**
+		 * Gets the current date and time in textual form.
+		 * 
+		 * @param[in]	isUTC Outputs the date and time in Coordinated Universal Time, otherwise in local time.
+		 * 
+		 * @return	A String containing the current date and time.
+		 * 
+		 * @note
+		 * Thread safe.
+		 * The output format is [DayOfWeek], [Month] [NumericalDate], [NumericalYear] [HH]::[MM]::[SS].
+		 */
+		String getCurrentDateTime(bool isUTC);
+
+		/**
+		 * Gets the current time in textual form
+		 * 
+		 * @param[in]	isUTC Outputs the time in Coordinated Universal Time, otherwise in local time.
+		 * 
+		 * @return	A String containing the current time.
+		 * 
+		 * @note
+		 * Thread safe.
+		 * The output format is [HH]::[MM]::[SS].
+		 */
+		String getCurrentTime(bool isUTC);
+
+		/**
+		 * Gets the date and time where the application has been started in textual form.
+		 *
+		 * @param[in]	isUTC Outputs the date and time in Coordinated Universal Time, otherwise in local time.
+		 * 
+		 * @return	A String containing the application startup date and time.
+		 * 
+		 * @note
+		 * Thread safe.
+		 * The output format is [DayOfWeek], [Month] [NumericalDate], [NumericalYear] [HH]::[MM]::[SS].
+		 */
+		String getAppStartUpDate(bool isUTC);
+
+
 		/** @name Internal 
 		 *  @{
 		 */
@@ -114,6 +154,7 @@ namespace bs
 		float mFrameDelta = 0.0f; /**< Frame delta in seconds */
 		float mTimeSinceStart = 0.0f; /**< Time since start in seconds */
 		UINT64 mTimeSinceStartMs = 0u;
+		bool mFirstFrame = true;
 
 		UINT64 mAppStartTime = 0u; /**< Time the application started, in microseconds */
 		UINT64 mLastFrameTime = 0u; /**< Time since last runOneFrame call, In microseconds */
@@ -122,7 +163,9 @@ namespace bs
 		// Fixed update
 		UINT64 mFixedStep = 16666; // 60 times a second in microseconds
 		UINT64 mLastFixedUpdateTime = 0;
-		bool mFirstFrame = true;
+		bool mFirstFixedFrame = true;
+
+		std::time_t mAppStartUpDate;
 
 		Timer* mTimer;
 	};

@@ -1127,7 +1127,7 @@ namespace bs
 		}
 
 		// If right click try to open context menu
-		if(buttonStates[2] == true) 
+		if(buttonStates[2])
 		{
 			for(auto& elementInfo : mElementsUnderPointer)
 			{
@@ -1678,10 +1678,6 @@ namespace bs
 
 	const RenderWindow* GUIManager::getWidgetWindow(const GUIWidget& widget) const
 	{
-		// This cast might not be valid (the render target could be a window), but we only really need to cast
-		// so that mInputBridge map allows us to search through it - we don't access anything unless the target is bridged
-		// (in which case we know it is a RenderTexture)
-
 		const Viewport* viewport = widget.getTarget();
 		if (viewport == nullptr)
 			return nullptr;
@@ -1690,6 +1686,9 @@ namespace bs
 		if (target == nullptr)
 			return nullptr;
 
+		// This cast might not be valid (the render target could be a window), but we only really need to cast
+		// so that mInputBridge map allows us to search through it - we don't access anything unless the target is bridged
+		// (in which case we know it is a RenderTexture)
 		const RenderTexture* renderTexture = static_cast<const RenderTexture*>(target.get());
 
 		auto iterFind = mInputBridge.find(renderTexture);

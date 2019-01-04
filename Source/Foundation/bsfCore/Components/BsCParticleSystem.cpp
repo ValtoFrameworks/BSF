@@ -29,20 +29,36 @@ namespace bs
 			mInternal->setSettings(settings);
 	}
 
-	ParticleSystemEmitters& CParticleSystem::getEmitters()
+	void CParticleSystem::setGpuSimulationSettings(const ParticleGpuSimulationSettings& settings)
 	{
-		if(mInternal)
-			return mInternal->getEmitters();
+		mGpuSimulationSettings = settings;
 
-		return mEmitters;
+		if(mInternal)
+			mInternal->setGpuSimulationSettings(settings);
 	}
 
-	ParticleSystemEvolvers& CParticleSystem::getEvolvers()
+	void CParticleSystem::setEvolvers(const Vector<SPtr<ParticleEvolver>>& evolvers)
 	{
-		if(mInternal)
-			return mInternal->getEvolvers();
+		mEvolvers = evolvers;
 
-		return mEvolvers;
+		if(mInternal)
+			mInternal->setEvolvers(evolvers);
+	}
+
+	void CParticleSystem::setEmitters(const Vector<SPtr<ParticleEmitter>>& emitters)
+	{
+		mEmitters = emitters;
+
+		if(mInternal)
+			mInternal->setEmitters(emitters);
+	}
+
+	void CParticleSystem::setLayer(UINT64 layer)
+	{
+		mLayer = layer;
+
+		if(mInternal)
+			mInternal->setLayer(layer);
 	}
 
 	void CParticleSystem::onDestroyed()
@@ -71,8 +87,10 @@ namespace bs
 		}
 
 		mInternal->setSettings(mSettings);
-		mInternal->getEmitters() = mEmitters;
-		mInternal->getEvolvers() = mEvolvers;
+		mInternal->setGpuSimulationSettings(mGpuSimulationSettings);
+		mInternal->setEmitters(mEmitters);
+		mInternal->setEvolvers(mEvolvers);
+		mInternal->setLayer(mLayer);
 	}
 
 	void CParticleSystem::destroyInternal()

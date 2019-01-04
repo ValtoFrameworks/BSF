@@ -41,7 +41,7 @@ namespace bs
 	class BS_CORE_EXPORT GpuParamsBase
 	{
 	public:
-		virtual ~GpuParamsBase();
+		virtual ~GpuParamsBase() = default;
 
 		// Note: Disallow copy/assign because it would require some care when copying (copy internal data shared_ptr and
 		// all the internal buffers too). Trivial to implement but not needed at this time. Un-delete and implement if necessary.
@@ -95,35 +95,16 @@ namespace bs
 		SPtr<GpuPipelineParamInfoBase> mParamInfo;
 	};
 
-	template<bool Core> struct TGpuParamsTypes { };
-	template<> struct TGpuParamsTypes < false >
-	{
-		typedef GpuParams GpuParamsType;
-		typedef HTexture TextureType;
-		typedef SPtr<GpuBuffer> BufferType;
-		typedef SPtr<SamplerState> SamplerType;
-		typedef SPtr<GpuParamBlockBuffer> ParamsBufferType;
-	};
-
-	template<> struct TGpuParamsTypes < true >
-	{
-		typedef ct::GpuParams GpuParamsType;
-		typedef SPtr<ct::Texture> TextureType;
-		typedef SPtr<ct::GpuBuffer> BufferType;
-		typedef SPtr<ct::SamplerState> SamplerType;
-		typedef SPtr<ct::GpuParamBlockBuffer> ParamsBufferType;
-	};
-
 	/** Templated version of GpuParams that contains functionality for both sim and core thread versions of stored data. */
 	template <bool Core>
 	class BS_CORE_EXPORT TGpuParams : public GpuParamsBase
 	{
 	public:
-		typedef typename TGpuParamsTypes<Core>::GpuParamsType GpuParamsType;
-		typedef typename TGpuParamsTypes<Core>::TextureType TextureType;
-		typedef typename TGpuParamsTypes<Core>::BufferType BufferType;
-		typedef typename TGpuParamsTypes<Core>::SamplerType SamplerType;
-		typedef typename TGpuParamsTypes<Core>::ParamsBufferType ParamsBufferType;
+		using GpuParamsType = CoreVariantType<GpuParams, Core>;
+		using TextureType = CoreVariantHandleType<Texture, Core>;
+		using BufferType = SPtr<CoreVariantType<GpuBuffer, Core>>;
+		using SamplerType = SPtr<CoreVariantType<SamplerState, Core>>;
+		using ParamsBufferType = SPtr<CoreVariantType<GpuParamBlockBuffer, Core>>;
 
 		virtual ~TGpuParams();
 

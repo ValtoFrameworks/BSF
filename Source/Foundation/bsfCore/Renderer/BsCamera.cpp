@@ -13,17 +13,14 @@
 #include "Renderer/BsRendererManager.h"
 #include "Renderer/BsRenderer.h"
 #include "Scene/BsSceneManager.h"
+#include "CoreThread/BsCoreObjectSync.h"
 
 namespace bs
 {
 	const float CameraBase::INFINITE_FAR_PLANE_ADJUST = 0.00001f;
 
 	CameraBase::CameraBase()
-		: mLayers(0xFFFFFFFFFFFFFFFF), mProjType(PT_PERSPECTIVE), mHorzFOV(Degree(90.0f)), mFarDist(500.0f)
-		, mNearDist(0.05f), mAspect(1.33333333333333f), mOrthoHeight(5), mPriority(0), mCustomViewMatrix(false)
-		, mCustomProjMatrix(false), mMSAA(1), mFrustumExtentsManuallySet(false), mProjMatrixRS(BsZero), mProjMatrix(BsZero)
-		, mViewMatrix(BsZero), mProjMatrixRSInv(BsZero), mProjMatrixInv(BsZero), mViewMatrixInv(BsZero)
-		, mRecalcFrustum(true), mRecalcFrustumPlanes(true), mRecalcView(true)
+		: mRecalcFrustum(true), mRecalcFrustumPlanes(true), mRecalcView(true)
 	{
 		mRenderSettings = bs_shared_ptr_new<RenderSettings>();
 
@@ -670,9 +667,25 @@ namespace bs
 		return Vector3(0.0f, 0.0f, 0.0f);
 	}
 
-	Camera::Camera()
-		:mMain(false)
-	{ }
+	template <bool Core>
+	template <class P>
+	void TCamera<Core>::rttiEnumFields(P p)
+	{
+		p(mLayers);
+		p(mProjType);
+		p(mHorzFOV);
+		p(mFarDist);
+		p(mNearDist);
+		p(mAspect);
+		p(mOrthoHeight);
+		p(mPriority);
+		p(mCustomViewMatrix);
+		p(mCustomProjMatrix);
+		p(mFrustumExtentsManuallySet);
+		p(mMSAA);
+		p(mMain);
+		p(*mRenderSettings);
+	}
 
 	SPtr<ct::Camera> Camera::getCore() const
 	{
@@ -724,6 +737,12 @@ namespace bs
 		CoreObject::destroy();
 	}
 
+	void Camera::setMain(bool main)
+	{
+		mMain = main;
+		gSceneManager()._notifyMainCameraStateChanged(std::static_pointer_cast<Camera>(getThisPtr()));
+	}
+
 	Rect2I Camera::getViewportRect() const
 	{
 		return mViewport->getPixelArea();
@@ -733,61 +752,20 @@ namespace bs
 	{
 		UINT32 dirtyFlag = getCoreDirtyFlags();
 
-		UINT32 size = getActorSyncDataSize();
-		size += rttiGetElemSize(dirtyFlag);
+		UINT32 size = rttiGetElemSize(dirtyFlag);
+		size += coreSyncGetElemSize((SceneActor&)*this);
 
-		UINT32 ppSize = 0;
 		if (dirtyFlag != (UINT32)ActorDirtyFlag::Transform)
-		{
-			size += rttiGetElemSize(mLayers);
-			size += rttiGetElemSize(mProjType);
-			size += rttiGetElemSize(mHorzFOV);
-			size += rttiGetElemSize(mFarDist);
-			size += rttiGetElemSize(mNearDist);
-			size += rttiGetElemSize(mAspect);
-			size += rttiGetElemSize(mOrthoHeight);
-			size += rttiGetElemSize(mPriority);
-			size += rttiGetElemSize(mCustomViewMatrix);
-			size += rttiGetElemSize(mCustomProjMatrix);
-			size += rttiGetElemSize(mFrustumExtentsManuallySet);
-			size += rttiGetElemSize(mMSAA);
-			size += sizeof(UINT32);
-
-			if(mRenderSettings != nullptr)
-			{
-				mRenderSettings->_getSyncData(nullptr, ppSize);
-				size += ppSize;
-			}
-		}
+			size += coreSyncGetElemSize(*this);
 
 		UINT8* buffer = allocator->alloc(size);
 
 		char* dataPtr = (char*)buffer;
-		dataPtr = syncActorTo(dataPtr);
 		dataPtr = rttiWriteElem(dirtyFlag, dataPtr);
+		dataPtr = coreSyncWriteElem((SceneActor&)*this, dataPtr);
 
 		if (dirtyFlag != (UINT32)ActorDirtyFlag::Transform)
-		{
-			dataPtr = rttiWriteElem(mLayers, dataPtr);
-			dataPtr = rttiWriteElem(mProjType, dataPtr);
-			dataPtr = rttiWriteElem(mHorzFOV, dataPtr);
-			dataPtr = rttiWriteElem(mFarDist, dataPtr);
-			dataPtr = rttiWriteElem(mNearDist, dataPtr);
-			dataPtr = rttiWriteElem(mAspect, dataPtr);
-			dataPtr = rttiWriteElem(mOrthoHeight, dataPtr);
-			dataPtr = rttiWriteElem(mPriority, dataPtr);
-			dataPtr = rttiWriteElem(mCustomViewMatrix, dataPtr);
-			dataPtr = rttiWriteElem(mCustomProjMatrix, dataPtr);
-			dataPtr = rttiWriteElem(mFrustumExtentsManuallySet, dataPtr);
-			dataPtr = rttiWriteElem(mMSAA, dataPtr);
-
-			dataPtr = rttiWriteElem(ppSize, dataPtr);
-
-			if(mRenderSettings != nullptr)
-				mRenderSettings->_getSyncData((UINT8*)dataPtr, ppSize);
-
-			dataPtr += ppSize;
-		}
+			dataPtr = coreSyncWriteElem(*this, dataPtr);
 
 		return CoreSyncData(buffer, size);
 	}
@@ -848,40 +826,15 @@ namespace bs
 		char* dataPtr = (char*)data.getBuffer();
 
 		UINT32 dirtyFlag;
-		dataPtr = syncActorFrom(dataPtr);
 		dataPtr = rttiReadElem(dirtyFlag, dataPtr);
+		dataPtr = coreSyncReadElem((SceneActor&)*this, dataPtr);
+
+		if (dirtyFlag != (UINT32)ActorDirtyFlag::Transform)
+			dataPtr = coreSyncReadElem(*this, dataPtr);
 
 		mRecalcFrustum = true;
 		mRecalcFrustumPlanes = true;
 		mRecalcView = true;
-
-		if (dirtyFlag != (UINT32)ActorDirtyFlag::Transform)
-		{
-			dataPtr = rttiReadElem(mLayers, dataPtr);
-			dataPtr = rttiReadElem(mProjType, dataPtr);
-			dataPtr = rttiReadElem(mHorzFOV, dataPtr);
-			dataPtr = rttiReadElem(mFarDist, dataPtr);
-			dataPtr = rttiReadElem(mNearDist, dataPtr);
-			dataPtr = rttiReadElem(mAspect, dataPtr);
-			dataPtr = rttiReadElem(mOrthoHeight, dataPtr);
-			dataPtr = rttiReadElem(mPriority, dataPtr);
-			dataPtr = rttiReadElem(mCustomViewMatrix, dataPtr);
-			dataPtr = rttiReadElem(mCustomProjMatrix, dataPtr);
-			dataPtr = rttiReadElem(mFrustumExtentsManuallySet, dataPtr);
-			dataPtr = rttiReadElem(mMSAA, dataPtr);
-
-			UINT32 ppSize = 0;
-			dataPtr = rttiReadElem(ppSize, dataPtr);
-
-			if(ppSize > 0)
-			{
-				if (mRenderSettings == nullptr)
-					mRenderSettings = bs_shared_ptr_new<RenderSettings>();
-
-				mRenderSettings->_setSyncData((UINT8*)dataPtr, ppSize);
-				dataPtr += ppSize;
-			}
-		}
 
 		RendererManager::instance().getActive()->notifyCameraUpdated(this, (UINT32)dirtyFlag);
 	}
