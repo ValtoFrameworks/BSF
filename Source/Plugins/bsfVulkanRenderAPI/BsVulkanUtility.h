@@ -17,8 +17,8 @@ namespace bs { namespace ct
 	{
 	public:
 		/**	Finds the closest pixel format that a specific Vulkan device supports. */
-		static PixelFormat getClosestSupportedPixelFormat(VulkanDevice& device, PixelFormat format, TextureType texType, 
-			int usage, bool optimalTiling, bool hwGamma);
+		static PixelFormat getClosestSupportedPixelFormat(const VulkanDevice& device, PixelFormat format,
+			TextureType texType, int usage, bool optimalTiling, bool hwGamma);
 
 		/** Converts between framework's and Vulkan pixel format. */
 		static VkFormat getPixelFormat(PixelFormat format, bool sRGB = false);
@@ -74,7 +74,10 @@ namespace bs { namespace ct
 		/** Gets Vulkan flags representing a certain shader stage. */
 		static VkShaderStageFlagBits getShaderStage(GpuProgramType type);
 
-		/** 
+		/** Converts a set of shader stage flags into a pipeline stage flags set containing the relevant shader stages. */
+		static VkPipelineStageFlags shaderToPipelineStage(VkShaderStageFlags shaderStageFlags);
+
+		/**
 		 * Populates the provided array with Vulkan devices that correspond to provided flags. Sets null in unused slots. 
 		 * Each device is placed at its own index in the output array.
 		 */

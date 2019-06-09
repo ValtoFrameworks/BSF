@@ -513,7 +513,7 @@ namespace bs
 	};
 
 	/** Determines the type of the source image for generating cubemaps. */
-	enum class CubemapSourceType
+	enum class BS_SCRIPT_EXPORT(m:Utility,api:bsf,api:bed) CubemapSourceType
 	{
 		/** Source is a single image that will be replicated on all cubemap faces. */
 		Single,
@@ -529,6 +529,24 @@ namespace bs
 
 		/** Source is a single cylindrical panoramic image. */
 		Cylindrical
+	};
+
+	/** Names of individual components of a vector. */
+	enum class BS_SCRIPT_EXPORT(m:Utility) VectorComponent
+	{
+		X, Y, Z, W
+	};
+
+	/** Names of individual components of a color. */
+	enum class BS_SCRIPT_EXPORT(m:Utility) ColorComponent
+	{
+		R, G, B, A
+	};
+
+	/** Identifiers representing a range of values. */
+	enum class BS_SCRIPT_EXPORT(m:Utility) RangeComponent
+	{
+		Min, Max
 	};
 
 	/** 
@@ -654,8 +672,6 @@ namespace bs
 		UINT8* data;
 		UINT32 size;
 	};
-
-	typedef Map<String, String> NameValuePairList;
 
 	/** @cond SPECIALIZATIONS */
 	BS_ALLOW_MEMCPY_SERIALIZATION(TextureSurface);

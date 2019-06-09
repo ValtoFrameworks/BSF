@@ -25,11 +25,18 @@
 	#include "Win32/BsWin32VideoModeInfo.h"
 #elif BS_PLATFORM == BS_PLATFORM_LINUX
 	#include "Linux/BsLinuxVideoModeInfo.h"
+#elif BS_PLATFORM == BS_PLATFORM_OSX
+	#include "MacOS/BsMacOSVideoModeInfo.h"
+	#include <MoltenVK/vk_mvk_moltenvk.h>
 #else
 	static_assert(false, "Other platform includes go here.");
 #endif
 
+#if BS_PLATFORM != BS_PLATFORM_OSX
 #define USE_VALIDATION_LAYERS 1
+#else
+#define USE_VALIDATION_LAYERS 0
+#endif
 
 namespace bs { namespace ct
 {
@@ -83,16 +90,10 @@ namespace bs { namespace ct
 	}
 
 	VulkanRenderAPI::VulkanRenderAPI()
-		:mInstance(nullptr)
 	{
 #if BS_DEBUG_MODE
 		mDebugCallback = nullptr;
 #endif
-	}
-
-	VulkanRenderAPI::~VulkanRenderAPI()
-	{
-
 	}
 
 	const StringID& VulkanRenderAPI::getName() const
@@ -109,9 +110,9 @@ namespace bs { namespace ct
 		VkApplicationInfo appInfo;
 		appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
 		appInfo.pNext = nullptr;
-		appInfo.pApplicationName = "Banshee3D App";
+		appInfo.pApplicationName = "bs::framework app";
 		appInfo.applicationVersion = 1;
-		appInfo.pEngineName = "Banshee3D";
+		appInfo.pEngineName = "bs::framework";
 		appInfo.engineVersion = (0 << 24) | (4 << 16) | 0;
 		appInfo.apiVersion = VK_API_VERSION_1_0;
 
@@ -146,8 +147,12 @@ namespace bs { namespace ct
 		extensions[1] = VK_KHR_WIN32_SURFACE_EXTENSION_NAME;
 #elif BS_PLATFORM == BS_PLATFORM_ANDROID
 		extensions[1] = VK_KHR_ANDROID_SURFACE_EXTENSION_NAME;
-#else
+#elif BS_PLATFORM == BS_PLATFORM_LINUX
 		extensions[1] = VK_KHR_XLIB_SURFACE_EXTENSION_NAME;
+#elif BS_PLATFORM == BS_PLATFORM_OSX
+		extensions[1] = VK_MVK_MACOS_SURFACE_EXTENSION_NAME;
+#else
+		static_assert(false, "Other platform includes go here.");
 #endif
 
 		uint32_t numExtensions = sizeof(extensions) / sizeof(extensions[0]);
@@ -182,6 +187,18 @@ namespace bs { namespace ct
 
 		result = vkCreateDebugReportCallbackEXT(mInstance, &debugInfo, nullptr, &mDebugCallback);
 		assert(result == VK_SUCCESS);
+#endif
+
+#if BS_PLATFORM == BS_PLATFORM_OSX
+		MVKConfiguration mvkConfig;
+		size_t mvkConfigSize = sizeof(MVKConfiguration);
+		vkGetMoltenVKConfigurationMVK(mInstance, &mvkConfig, &mvkConfigSize);
+
+#if BS_DEBUG_MODE
+		mvkConfig.debugMode = VK_TRUE;
+#endif
+
+		vkSetMoltenVKConfigurationMVK(mInstance, &mvkConfig, &mvkConfigSize);
 #endif
 
 		// Enumerate all devices
@@ -230,6 +247,8 @@ namespace bs { namespace ct
 		mVideoModeInfo = bs_shared_ptr_new<Win32VideoModeInfo>();
 #elif BS_PLATFORM == BS_PLATFORM_LINUX
 		mVideoModeInfo = bs_shared_ptr_new<LinuxVideoModeInfo>();
+#elif BS_PLATFORM == BS_PLATFORM_OSX
+		mVideoModeInfo = bs_shared_ptr_new<MacOSVideoModeInfo>();
 #else
 		static_assert(false, "mVideoModeInfo needs to be created.");
 #endif
@@ -279,12 +298,17 @@ namespace bs { namespace ct
 		// Create vertex input manager
 		VulkanVertexInputManager::startUp();
 
-		// Create & register HLSL factory		
+		// Create & register GPU program factories
 		mGLSLFactory = bs_new<VulkanGLSLProgramFactory>();
+
+#if BS_PLATFORM == BS_PLATFORM_OSX
+		GpuProgramManager::instance().addFactory("mvksl", mGLSLFactory);
+#else
+		GpuProgramManager::instance().addFactory("vksl", mGLSLFactory);
+#endif
 
 		// Create render state manager
 		RenderStateManager::startUp<VulkanRenderStateManager>();
-		GpuProgramManager::instance().addFactory("vksl", mGLSLFactory);
 
 		initCapabilites();
 		
@@ -566,23 +590,6 @@ namespace bs { namespace ct
 		dest[2][3] = (dest[2][3] + dest[3][3]) / 2;
 	}
 
-	const RenderAPIInfo& VulkanRenderAPI::getAPIInfo() const
-	{
-		RenderAPIFeatures featureFlags =
-			RenderAPIFeatureFlag::NDCYAxisDown |
-			RenderAPIFeatureFlag::ColumnMajorMatrices |
-			RenderAPIFeatureFlag::MultiThreadedCB |
-			RenderAPIFeatureFlag::MSAAImageStores |
-			RenderAPIFeatureFlag::TextureViews |
-			RenderAPIFeatureFlag::Compute |
-			RenderAPIFeatureFlag::LoadStore |
-			RenderAPIFeatureFlag::ByteCodeCaching |
-			RenderAPIFeatureFlag::RenderTargetLayers;
-
-		static RenderAPIInfo info(0.0f, 0.0f, 0.0f, 1.0f, VET_COLOR_ABGR, featureFlags);
-		return info;
-	}
-
 	GpuParamBlockDesc VulkanRenderAPI::generateParamBlockDesc(const String& name, Vector<GpuParamDataDesc>& params)
 	{
 		GpuParamBlockDesc block;
@@ -604,25 +611,11 @@ namespace bs { namespace ct
 			else
 				size = VulkanUtility::calcInterfaceBlockElementSizeAndOffset(param.type, param.arraySize, block.blockSize);
 
-			if (param.arraySize > 1)
-			{
-				param.elementSize = size;
-				param.arrayElementStride = size;
-				param.cpuMemOffset = block.blockSize;
-				param.gpuMemOffset = 0;
-
-				block.blockSize += size * param.arraySize;
-			}
-			else
-			{
-				param.elementSize = size;
-				param.arrayElementStride = size;
-				param.cpuMemOffset = block.blockSize;
-				param.gpuMemOffset = 0;
-
-				block.blockSize += size;
-			}
-
+			param.elementSize = size;
+			param.arrayElementStride = size;
+			param.cpuMemOffset = block.blockSize;
+			param.gpuMemOffset = 0;
+			block.blockSize += size * param.arraySize;
 			param.paramBlockSlot = 0;
 			param.paramBlockSet = 0;
 		}
@@ -654,28 +647,28 @@ namespace bs { namespace ct
 			driverVersion.release = (uint32_t)(deviceProps.apiVersion) & 0xfff;
 			driverVersion.build = 0;
 
-			caps.setDriverVersion(driverVersion);
-			caps.setDeviceName(deviceProps.deviceName);
+			caps.driverVersion = driverVersion;
+			caps.deviceName = deviceProps.deviceName;
 			
 			// Determine vendor
 			switch (deviceProps.vendorID)
 			{
 			case 0x10DE:
-				caps.setVendor(GPU_NVIDIA);
+				caps.deviceVendor = GPU_NVIDIA;
 				break;
 			case 0x1002:
-				caps.setVendor(GPU_AMD);
+				caps.deviceVendor = GPU_AMD;
 				break;
 			case 0x163C:
 			case 0x8086:
-				caps.setVendor(GPU_INTEL);
+				caps.deviceVendor = GPU_INTEL;
 				break;
 			default:
-				caps.setVendor(GPU_UNKNOWN);
+				caps.deviceVendor = GPU_UNKNOWN;
 				break;
 			};
 			
-			caps.setRenderAPIName(getName());
+			caps.renderAPIName = getName();
 
 			if(deviceFeatures.textureCompressionBC)
 				caps.setCapability(RSC_TEXTURE_COMPRESSION_BC);
@@ -686,54 +679,70 @@ namespace bs { namespace ct
 			if (deviceFeatures.textureCompressionASTC_LDR)
 				caps.setCapability(RSC_TEXTURE_COMPRESSION_ASTC);
 
-			caps.setMaxBoundVertexBuffers(deviceLimits.maxVertexInputBindings);
-			caps.setNumMultiRenderTargets(deviceLimits.maxColorAttachments);
-
 			caps.setCapability(RSC_COMPUTE_PROGRAM);
+			caps.setCapability(RSC_LOAD_STORE);
+			caps.setCapability(RSC_LOAD_STORE_MSAA);
+			caps.setCapability(RSC_BYTECODE_CACHING);
+			caps.setCapability(RSC_TEXTURE_VIEWS);
+			caps.setCapability(RSC_RENDER_TARGET_LAYERS);
+			caps.setCapability(RSC_MULTI_THREADED_CB);
 
-			caps.setNumTextureUnits(GPT_FRAGMENT_PROGRAM, deviceLimits.maxPerStageDescriptorSampledImages);
-			caps.setNumTextureUnits(GPT_VERTEX_PROGRAM, deviceLimits.maxPerStageDescriptorSampledImages);
-			caps.setNumTextureUnits(GPT_COMPUTE_PROGRAM, deviceLimits.maxPerStageDescriptorSampledImages);
+			caps.conventions.ndcYAxis = Conventions::Axis::Down;
+			caps.conventions.matrixOrder = Conventions::MatrixOrder::ColumnMajor;
 
-			caps.setNumGpuParamBlockBuffers(GPT_FRAGMENT_PROGRAM, deviceLimits.maxPerStageDescriptorUniformBuffers);
-			caps.setNumGpuParamBlockBuffers(GPT_VERTEX_PROGRAM, deviceLimits.maxPerStageDescriptorUniformBuffers);
-			caps.setNumGpuParamBlockBuffers(GPT_COMPUTE_PROGRAM, deviceLimits.maxPerStageDescriptorUniformBuffers);
+			caps.maxBoundVertexBuffers = deviceLimits.maxVertexInputBindings;
+			caps.numMultiRenderTargets = deviceLimits.maxColorAttachments;
 
-			caps.setNumLoadStoreTextureUnits(GPT_FRAGMENT_PROGRAM, deviceLimits.maxPerStageDescriptorStorageImages);
-			caps.setNumLoadStoreTextureUnits(GPT_COMPUTE_PROGRAM, deviceLimits.maxPerStageDescriptorStorageImages);
+			caps.numTextureUnitsPerStage[GPT_FRAGMENT_PROGRAM] = deviceLimits.maxPerStageDescriptorSampledImages;
+			caps.numTextureUnitsPerStage[GPT_VERTEX_PROGRAM] = deviceLimits.maxPerStageDescriptorSampledImages;
+			caps.numTextureUnitsPerStage[GPT_COMPUTE_PROGRAM] = deviceLimits.maxPerStageDescriptorSampledImages;
+
+			caps.numGpuParamBlockBuffersPerStage[GPT_FRAGMENT_PROGRAM] = deviceLimits.maxPerStageDescriptorUniformBuffers;
+			caps.numGpuParamBlockBuffersPerStage[GPT_VERTEX_PROGRAM] = deviceLimits.maxPerStageDescriptorUniformBuffers;
+			caps.numGpuParamBlockBuffersPerStage[GPT_COMPUTE_PROGRAM] = deviceLimits.maxPerStageDescriptorUniformBuffers;
+
+			caps.numLoadStoreTextureUnitsPerStage[GPT_FRAGMENT_PROGRAM] = deviceLimits.maxPerStageDescriptorStorageImages;
+			caps.numLoadStoreTextureUnitsPerStage[GPT_COMPUTE_PROGRAM] = deviceLimits.maxPerStageDescriptorStorageImages;
 
 			if(deviceFeatures.geometryShader)
 			{
 				caps.setCapability(RSC_GEOMETRY_PROGRAM);
 				caps.addShaderProfile("gs_5_0");
-				caps.setNumTextureUnits(GPT_GEOMETRY_PROGRAM, deviceLimits.maxPerStageDescriptorSampledImages);
-				caps.setNumGpuParamBlockBuffers(GPT_GEOMETRY_PROGRAM, deviceLimits.maxPerStageDescriptorUniformBuffers);
-				caps.setGeometryProgramNumOutputVertices(deviceLimits.maxGeometryOutputVertices);
+				caps.numTextureUnitsPerStage[GPT_GEOMETRY_PROGRAM] = deviceLimits.maxPerStageDescriptorSampledImages;
+				caps.numGpuParamBlockBuffersPerStage[GPT_GEOMETRY_PROGRAM] = deviceLimits.maxPerStageDescriptorUniformBuffers;
+				caps.geometryProgramNumOutputVertices = deviceLimits.maxGeometryOutputVertices;
 			}
 
 			if (deviceFeatures.tessellationShader)
 			{
 				caps.setCapability(RSC_TESSELLATION_PROGRAM);
 
-				caps.setNumTextureUnits(GPT_HULL_PROGRAM, deviceLimits.maxPerStageDescriptorSampledImages);
-				caps.setNumTextureUnits(GPT_DOMAIN_PROGRAM, deviceLimits.maxPerStageDescriptorSampledImages);
+				caps.numTextureUnitsPerStage[GPT_HULL_PROGRAM] = deviceLimits.maxPerStageDescriptorSampledImages;
+				caps.numTextureUnitsPerStage[GPT_DOMAIN_PROGRAM] = deviceLimits.maxPerStageDescriptorSampledImages;
 				
-				caps.setNumGpuParamBlockBuffers(GPT_HULL_PROGRAM, deviceLimits.maxPerStageDescriptorUniformBuffers);
-				caps.setNumGpuParamBlockBuffers(GPT_DOMAIN_PROGRAM, deviceLimits.maxPerStageDescriptorUniformBuffers);
+				caps.numGpuParamBlockBuffersPerStage[GPT_HULL_PROGRAM] = deviceLimits.maxPerStageDescriptorUniformBuffers;
+				caps.numGpuParamBlockBuffersPerStage[GPT_DOMAIN_PROGRAM] = deviceLimits.maxPerStageDescriptorUniformBuffers;
 			}
 
-			caps.setNumCombinedTextureUnits(caps.getNumTextureUnits(GPT_FRAGMENT_PROGRAM)
-				+ caps.getNumTextureUnits(GPT_VERTEX_PROGRAM) + caps.getNumTextureUnits(GPT_GEOMETRY_PROGRAM)
-				+ caps.getNumTextureUnits(GPT_HULL_PROGRAM) + caps.getNumTextureUnits(GPT_DOMAIN_PROGRAM)
-				+ caps.getNumTextureUnits(GPT_COMPUTE_PROGRAM));
+			caps.numCombinedTextureUnits
+				= caps.numTextureUnitsPerStage[GPT_FRAGMENT_PROGRAM]
+				+ caps.numTextureUnitsPerStage[GPT_VERTEX_PROGRAM] 
+				+ caps.numTextureUnitsPerStage[GPT_GEOMETRY_PROGRAM]
+				+ caps.numTextureUnitsPerStage[GPT_HULL_PROGRAM] 
+				+ caps.numTextureUnitsPerStage[GPT_DOMAIN_PROGRAM]
+				+ caps.numTextureUnitsPerStage[GPT_COMPUTE_PROGRAM];
 
-			caps.setNumCombinedGpuParamBlockBuffers(caps.getNumGpuParamBlockBuffers(GPT_FRAGMENT_PROGRAM)
-				+ caps.getNumGpuParamBlockBuffers(GPT_VERTEX_PROGRAM) + caps.getNumGpuParamBlockBuffers(GPT_GEOMETRY_PROGRAM)
-				+ caps.getNumGpuParamBlockBuffers(GPT_HULL_PROGRAM) + caps.getNumGpuParamBlockBuffers(GPT_DOMAIN_PROGRAM)
-				+ caps.getNumGpuParamBlockBuffers(GPT_COMPUTE_PROGRAM));
+			caps.numCombinedParamBlockBuffers
+				= caps.numGpuParamBlockBuffersPerStage[GPT_FRAGMENT_PROGRAM]
+				+ caps.numGpuParamBlockBuffersPerStage[GPT_VERTEX_PROGRAM] 
+				+ caps.numGpuParamBlockBuffersPerStage[GPT_GEOMETRY_PROGRAM]
+				+ caps.numGpuParamBlockBuffersPerStage[GPT_HULL_PROGRAM] 
+				+ caps.numGpuParamBlockBuffersPerStage[GPT_DOMAIN_PROGRAM]
+				+ caps.numGpuParamBlockBuffersPerStage[GPT_COMPUTE_PROGRAM];
 
-			caps.setNumCombinedLoadStoreTextureUnits(caps.getNumLoadStoreTextureUnits(GPT_FRAGMENT_PROGRAM)
-				+ caps.getNumLoadStoreTextureUnits(GPT_COMPUTE_PROGRAM));
+			caps.numCombinedLoadStoreTextureUnits
+				= caps.numLoadStoreTextureUnitsPerStage[GPT_FRAGMENT_PROGRAM]
+				+ caps.numLoadStoreTextureUnitsPerStage[GPT_COMPUTE_PROGRAM];
 
 			caps.addShaderProfile("glsl");
 

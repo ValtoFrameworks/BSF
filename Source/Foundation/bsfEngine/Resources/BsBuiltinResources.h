@@ -29,7 +29,7 @@ namespace bs
 	};
 
 	/** Types of builtin shaders that are always available. */
-	enum class BuiltinShader
+	enum class BS_SCRIPT_EXPORT() BuiltinShader
 	{
 		Custom, 
 		/** Physically based shader used for opaque 3D geometry. */
@@ -116,9 +116,6 @@ namespace bs
 		/**	Creates a material used for image sprite rendering (for example images in GUI). */
 		HMaterial createSpriteImageMaterial() const;
 
-		/**	Creates a material used for non-transparent image sprite rendering (for example images in GUI). */
-		HMaterial createSpriteNonAlphaImageMaterial() const;
-
 		/** Creates a material used for antialiased line rendering (for example curve rendering in GUI). */
 		HMaterial createSpriteLineMaterial() const;
 
@@ -153,7 +150,9 @@ namespace bs
 		static constexpr const char* SHADER_FOLDER = "Shaders/";
 		static constexpr const char* CURSOR_FOLDER = "Cursors/";
 		static constexpr const char* ICON_FOLDER = "Icons/";
-		static constexpr const char* SKIN_FOLDER = "Skin/"; 
+		static constexpr const char* ICON3D_FOLDER = "Icons3D/";
+		static constexpr const char* SKIN_FOLDER = "Skin/";
+		static constexpr const char* ANIMATED_SPRITES_FOLDER = "AnimatedSprites/";
 		static constexpr const char* SHADER_INCLUDE_FOLDER = "Shaders/Includes/";
 		static constexpr const char* MESH_FOLDER = "Meshes/";
 		static constexpr const char* TEXTURE_FOLDER = "Textures/";
@@ -204,7 +203,6 @@ namespace bs
 
 		HShader mShaderSpriteText;
 		HShader mShaderSpriteImage;
-		HShader mShaderSpriteNonAlphaImage;
 		HShader mShaderSpriteLine;
 		HShader mShaderDiffuse;
 		HShader mShaderTransparent;
@@ -249,8 +247,7 @@ namespace bs
 		static const Vector2I CursorSizeWEHotspot;
 
 		static const String ShaderSpriteTextFile;
-		static const String ShaderSpriteImageAlphaFile;
-		static const String ShaderSpriteImageNoAlphaFile;
+		static const String ShaderSpriteImageFile;
 		static const String ShaderSpriteLineFile;
 	};
 

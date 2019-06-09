@@ -75,7 +75,7 @@ namespace bs
 	class BS_CORE_EXPORT BS_SCRIPT_EXPORT(m:Audio) AudioClip : public Resource
 	{
 	public:
-		virtual ~AudioClip() { }
+		virtual ~AudioClip() = default;
 
 		/** Returns the size of a single sample, in bits. */
 		BS_SCRIPT_EXPORT(n:BitDepth,pr:getter)
@@ -159,8 +159,8 @@ namespace bs
 		AUDIO_CLIP_DESC mDesc;
 		UINT32 mNumSamples;
 		UINT32 mStreamSize;
-		UINT32 mStreamOffset;
-		float mLength;
+		UINT32 mStreamOffset = 0;
+		float mLength = 0.0f;
 		SPtr<DataStream> mStreamData;
 
 		/************************************************************************/

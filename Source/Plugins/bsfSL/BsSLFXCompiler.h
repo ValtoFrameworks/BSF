@@ -16,7 +16,7 @@ extern "C" {
 
 namespace bs
 {
-	/** @addtogroup BansheeSL
+	/** @addtogroup bsfSL
 	 *  @{
 	 */
 
@@ -62,11 +62,26 @@ namespace bs
 			String computeCode;
 		};
 
+		/** A set of attributes describing a BSL construct. */
+		struct AttributeData
+		{
+			Vector<std::pair<INT32, String>> attributes;
+		};
+
+		/** Value of a single variation option along with an optional name. */
+		struct VariationOption
+		{
+			String name;
+			UINT32 value;
+		};
+
 		/** Information about different variations of a single shader. */
 		struct VariationData
 		{
+			String name;
 			String identifier;
-			Vector<UINT32> values;
+			bool internal = true;
+			Vector<VariationOption> values;
 		};
 
 		/** Information describing a shader/mixin node, without the actual contents. */
@@ -123,6 +138,12 @@ namespace bs
 
 		/** Parses shader variations and writes them to the provided meta-data object. */
 		static void parseVariations(ShaderMetaData& metaData, ASTFXNode* variations);
+
+		/** Parses a single variation option node. */
+		static VariationOption parseVariationOption(ASTFXNode* variationOption);
+
+		/** Parses BSL attributes. */
+		static AttributeData parseAttributes(ASTFXNode* attributes);
 
 		/**	Maps BSL queue sort type enum into in-engine queue sort type mode. */
 		static QueueSortType parseSortType(CullAndSortModeValue sortType);
@@ -234,6 +255,9 @@ namespace bs
 		 * the @p shaderMetaData array, for any non-mixins.
 		 */
 		static BSLFXCompileResult populateVariations(Vector<std::pair<ASTFXNode*, ShaderMetaData>>& shaderMetaData);
+
+		/** Populates the information about variation parameters and their values. */
+		static void populateVariationParamInfos(const ShaderMetaData& shaderMetaData, SHADER_DESC& desc);
 
 		/**
 		 * Parses the provided source and generates a SHADER_DESC containing techniques for all shader variations, any

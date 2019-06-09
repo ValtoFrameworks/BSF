@@ -27,7 +27,7 @@ namespace bs
 	/** Contains information about a currently playing animation clip. */
 	struct BS_SCRIPT_EXPORT(pl:true,m:Animation) AnimationClipState
 	{
-		AnimationClipState() { }
+		AnimationClipState() = default;
 
 		/** Layer the clip is playing on. Multiple clips can be played simulatenously on different layers. */
 		UINT32 layer = 0; 
@@ -90,30 +90,30 @@ namespace bs
 	/** Internal information about a single playing animation clip within Animation. */
 	struct AnimationClipInfo
 	{
-		AnimationClipInfo();
+		AnimationClipInfo() = default;
 		AnimationClipInfo(const HAnimationClip& clip);
 
 		HAnimationClip clip;
 		AnimationClipState state;
-		AnimPlaybackType playbackType;
+		AnimPlaybackType playbackType = AnimPlaybackType::Normal;
 
-		float fadeDirection;
-		float fadeTime;
-		float fadeLength;
+		float fadeDirection = 0.0f;
+		float fadeTime = 0.0f;
+		float fadeLength = 0.0f;
 
 		/** 
 		 * Version of the animation curves used by the AnimationProxy. Used to detecting the internal animation curves
 		 * changed. 
 		 */
-		UINT64 curveVersion; 
-		UINT32 layerIdx; /**< Layer index this clip belongs to in AnimationProxy structure. */
-		UINT32 stateIdx; /**< State index this clip belongs to in AnimationProxy structure. */
+		UINT64 curveVersion = 0; 
+		UINT32 layerIdx = (UINT32)-1; /**< Layer index this clip belongs to in AnimationProxy structure. */
+		UINT32 stateIdx = (UINT32)-1; /**< State index this clip belongs to in AnimationProxy structure. */
 	};
 
 	/** Represents an animation clip used in 1D blending. Each clip has a position on the number line. */
 	struct BS_CORE_EXPORT BS_SCRIPT_EXPORT(pl:true,m:Animation) BlendClipInfo
 	{
-		BlendClipInfo() { }
+		BlendClipInfo() = default;
 
 		HAnimationClip clip;
 		float position = 0.0f;
@@ -248,25 +248,25 @@ namespace bs
 		UINT64 id;
 
 		// Skeletal animation
-		AnimationStateLayer* layers;
-		UINT32 numLayers;
+		AnimationStateLayer* layers = nullptr;
+		UINT32 numLayers = 0;
 		SPtr<Skeleton> skeleton;
 		SkeletonMask skeletonMask;
-		UINT32 numSceneObjects;
-		AnimatedSceneObjectInfo* sceneObjectInfos;
-		Matrix4* sceneObjectTransforms;
+		UINT32 numSceneObjects = 0;
+		AnimatedSceneObjectInfo* sceneObjectInfos = nullptr;
+		Matrix4* sceneObjectTransforms = nullptr;
 
 		// Morph shape animation
-		MorphChannelInfo* morphChannelInfos;
-		MorphShapeInfo* morphShapeInfos;
-		UINT32 numMorphChannels;
-		UINT32 numMorphShapes;
-		UINT32 numMorphVertices;
-		bool morphChannelWeightsDirty;
+		MorphChannelInfo* morphChannelInfos = nullptr;
+		MorphShapeInfo* morphShapeInfos = nullptr;
+		UINT32 numMorphChannels = 0;
+		UINT32 numMorphShapes = 0;
+		UINT32 numMorphVertices = 0;
+		bool morphChannelWeightsDirty = false;
 
 		// Culling
 		AABox mBounds;
-		bool mCullEnabled;
+		bool mCullEnabled = true;
 
 		// Single frame sample
 		AnimSampleStep sampleStep = AnimSampleStep::None;
@@ -274,8 +274,9 @@ namespace bs
 		// Evaluation results
 		LocalSkeletonPose skeletonPose;
 		LocalSkeletonPose sceneObjectPose;
-		UINT32 numGenericCurves;
-		float* genericCurveOutputs;
+		UINT32 numGenericCurves = 0;
+		float* genericCurveOutputs = nullptr;
+		bool wasCulled = false;
 	};
 
 	/**
@@ -497,10 +498,9 @@ namespace bs
 		/** 
 		 * Triggers any events between the last frame and current one. 
 		 *
-		 * @param[in]	lastFrameTime	Time of the last frame.
-		 * @param[in]	delta			Difference between the last and this frame.
+		 * @param[in]	delta			Time elapsed since the last call to this method.
 		 */
-		void triggerEvents(float lastFrameTime, float delta);
+		void triggerEvents(float delta);
 
 		/** 
 		 * Updates the animation proxy object based on the currently set skeleton, playing clips and dirty flags. 
@@ -533,11 +533,11 @@ namespace bs
 		void notifyResourceChanged(const HResource& resource) override;
 
 		UINT64 mId;
-		AnimWrapMode mDefaultWrapMode;
-		float mDefaultSpeed;
+		AnimWrapMode mDefaultWrapMode = AnimWrapMode::Loop;
+		float mDefaultSpeed = 1.0f;
 		AABox mBounds;
-		bool mCull;
-		AnimDirtyState mDirty;
+		bool mCull = true;
+		AnimDirtyState mDirty = AnimDirtyStateFlag::All;
 
 		SPtr<Skeleton> mSkeleton;
 		SkeletonMask mSkeletonMask;
@@ -546,7 +546,7 @@ namespace bs
 		Vector<AnimationClipInfo> mClipInfos;
 		UnorderedMap<UINT64, AnimatedSceneObject> mSceneObjects;
 		Vector<float> mGenericCurveOutputs;
-		bool mGenericCurveValuesValid;
+		bool mGenericCurveValuesValid = false;
 		AnimSampleStep mSampleStep = AnimSampleStep::None;
 
 		// Animation thread only

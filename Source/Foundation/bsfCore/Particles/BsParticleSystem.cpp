@@ -14,6 +14,7 @@
 #include "Particles/BsVectorField.h"
 #include "Mesh/BsMesh.h"
 #include "CoreThread/BsCoreObjectSync.h"
+#include "Scene/BsSceneManager.h"
 
 namespace bs
 {
@@ -163,6 +164,7 @@ namespace bs
 
 		mSettings = settings; 
 		_markCoreDirty();
+		markDependenciesDirty();
 	}
 
 	void ParticleSystem::setGpuSimulationSettings(const ParticleGpuSimulationSettings& settings)
@@ -198,10 +200,13 @@ namespace bs
 		std::sort(mEvolvers.begin(), mEvolvers.end(), 
 			[](const SPtr<ParticleEvolver>& a, const SPtr<ParticleEvolver>& b)
 		{
-			if (a->getProperties().priority == b->getProperties().priority)
+			INT32 priorityA = a ? a->getProperties().priority : 0;
+			INT32 priorityB = b ? b->getProperties().priority : 0;
+
+			if (priorityA == priorityB)
 				return a > b; // Use address, at this point it doesn't matter, but sorting requires us to differentiate
 			else
-				return a->getProperties().priority > b->getProperties().priority;
+				return priorityA > priorityB;
 		});
 
 		_markCoreDirty();
@@ -263,6 +268,7 @@ namespace bs
 		state.localToWorld = mTransform.getMatrix();
 		state.worldToLocal = state.localToWorld.inverseAffine();
 		state.system = this;
+		state.scene = (mScene && mScene->isActive()) ? mScene.get() : gSceneManager().getMainScene().get();
 		state.animData = animData;
 
 		// For GPU simulation we only care about newly spawned particles, so clear old ones
@@ -271,7 +277,10 @@ namespace bs
 
 		// Spawn new particles
 		for(auto& emitter : mEmitters)
-			emitter->spawn(mRandom, state, *mParticleSet);
+		{
+			if(emitter)
+				emitter->spawn(mRandom, state, *mParticleSet);
+		}
 
 		// Simulate if running on CPU, otherwise just pass the spawned particles off to the core thread
 		if(!mSettings.gpuSimulation)
@@ -329,6 +338,9 @@ namespace bs
 		// Evolve pre-simulation
 		for(auto& evolver : mEvolvers)
 		{
+			if(!evolver)
+				continue;
+
 			const ParticleEvolverProperties& props = evolver->getProperties();
 			if (props.priority < 0)
 				break;
@@ -364,6 +376,9 @@ namespace bs
 		// Evolve post-simulation
 		for(auto& evolver : mEvolvers)
 		{
+			if(!evolver)
+				continue;
+
 			const ParticleEvolverProperties& props = evolver->getProperties();
 			if(props.priority >= 0)
 				continue;
@@ -443,6 +458,15 @@ namespace bs
 		dataPtr = rttiWriteElem(mLayer, dataPtr);
 
 		return CoreSyncData(data, size);
+	}
+
+	void ParticleSystem::getCoreDependencies(Vector<CoreObject*>& dependencies)
+	{
+		if (mSettings.mesh.isLoaded())
+			dependencies.push_back(mSettings.mesh.get());
+
+		if (mSettings.material.isLoaded())
+			dependencies.push_back(mSettings.material.get());
 	}
 
 	SPtr<ParticleSystem> ParticleSystem::create()

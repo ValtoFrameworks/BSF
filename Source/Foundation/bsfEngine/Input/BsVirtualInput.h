@@ -5,6 +5,7 @@
 #include "BsPrerequisites.h"
 #include "Utility/BsModule.h"
 #include "Input/BsInputConfiguration.h"
+#include "Utility/BsDynArray.h"
 
 namespace bs
 {
@@ -41,6 +42,7 @@ namespace bs
 		struct DeviceData
 		{
 			Map<UINT32, ButtonData> cachedStates;
+			DynArray<UINT32> heldButtons;
 		};
 
 		/**	Data container for a virtual button event. */
@@ -126,7 +128,7 @@ namespace bs
 		SPtr<InputConfiguration> mInputConfiguration;
 		Vector<DeviceData> mDevices;
 		Queue<VirtualButtonEvent> mEvents;
-		UINT32 mActiveModifiers;
+		UINT32 mActiveModifiers = (UINT32)ButtonModifier::None;
 
 		// Transient
 		Vector<VirtualButton> tempButtons;

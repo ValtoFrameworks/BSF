@@ -9,7 +9,9 @@ namespace bs
 	GUIElementContainer::GUIElementContainer(const GUIDimensions& dimensions, const String& style, 
 		GUIElementOptions options)
 		:GUIElement(style, dimensions, options)
-	{ }
+	{
+		mOptionFlags.set(GUIElementOption::ClickThrough);
+	}
 
 	UINT32 GUIElementContainer::_getNumRenderElements() const
 	{
@@ -37,6 +39,14 @@ namespace bs
 	Vector2I GUIElementContainer::_getOptimalSize() const
 	{
 		return Vector2I();
+	}
+
+	void GUIElementContainer::setFocus(bool enabled, bool clear)
+	{
+		if(mFocusElement)
+			mFocusElement->setFocus(enabled, clear);
+		else
+			GUIElement::setFocus(enabled, clear);
 	}
 
 	bool GUIElementContainer::_commandEvent(const GUICommandEvent& ev)

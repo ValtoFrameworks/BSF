@@ -11,7 +11,6 @@ namespace bs
 	const UINT32 ProfilerGPU::MAX_QUEUE_ELEMENTS = 5;
 
 	ProfilerGPU::ProfilerGPU()
-		:mIsFrameActive(false), mReadyReports(nullptr), mReportHeadPos(0), mReportCount(0)
 	{
 		mReadyReports = bs_newN<GPUProfilerReport>(MAX_QUEUE_ELEMENTS);
 	}
@@ -44,7 +43,7 @@ namespace bs
 		mIsFrameActive = true;
 	}
 
-	void ProfilerGPU::endFrame()
+	void ProfilerGPU::endFrame(bool discard)
 	{
 		if (!mActiveSamples.empty())
 		{
@@ -57,7 +56,9 @@ namespace bs
 
 		endSampleInternal(mFrameSample);
 
-		mUnresolvedFrames.push(mFrameSample);
+		if(!discard)
+			mUnresolvedFrames.push(mFrameSample);
+
 		mIsFrameActive = false;
 	}
 

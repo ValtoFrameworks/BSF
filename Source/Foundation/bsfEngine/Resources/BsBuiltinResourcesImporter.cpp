@@ -45,7 +45,6 @@ int main(int argc, char * argv[])
 	desc.renderer = BS_RENDERER_MODULE;
 	desc.audio = BS_AUDIO_MODULE;
 	desc.physics = BS_PHYSICS_MODULE;
-	desc.scripting = false;
 
 	desc.importers.push_back("bsfFreeImgImporter");
 	desc.importers.push_back("bsfFBXImporter");
@@ -291,9 +290,11 @@ namespace bs
 		json dataListJSON = json::parse(dataListStream->getAsString().c_str());
 
 		json skinJSON = dataListJSON["Skin"];
+		json animatedSpritesJSON = dataListJSON["AnimatedSprites"];
 		json cursorsJSON = dataListJSON["Cursors"];
 		json iconsJSON = dataListJSON["Icons"];
 		json spriteIconsJSON = dataListJSON["SpriteIcons"];
+		json spriteIcons3DJSON = dataListJSON["SpriteIcons3D"];
 		json includesJSON = dataListJSON["Includes"];
 		json shadersJSON = dataListJSON["Shaders"];
 		json fontsJSON = dataListJSON["Fonts"];
@@ -301,8 +302,10 @@ namespace bs
 		json splashScreenJSON = dataListJSON["SplashScreen"];
 
 		const Path rawSkinFolder = sInputFolder + BuiltinResources::SKIN_FOLDER;
+		const Path rawAnimatedSpritesFolder = sInputFolder + BuiltinResources::ANIMATED_SPRITES_FOLDER;
 		const Path rawCursorFolder = sInputFolder + BuiltinResources::CURSOR_FOLDER;
 		const Path rawIconFolder = sInputFolder + BuiltinResources::ICON_FOLDER;
+		const Path rawIcon3DFolder = sInputFolder + BuiltinResources::ICON3D_FOLDER;
 		const Path rawShaderFolder = sInputFolder + BuiltinResources::SHADER_FOLDER;
 		const Path rawShaderIncludeFolder = sInputFolder + BuiltinResources::SHADER_INCLUDE_FOLDER;
 
@@ -331,6 +334,14 @@ namespace bs
 				rawIconFolder,
 				BuiltinResourcesHelper::AssetType::Sprite,
 				spriteIconsJSON);
+		}
+
+		if(!spriteIcons3DJSON.is_null())
+		{
+			updatedDataLists |= BuiltinResourcesHelper::updateJSON(
+				rawIcon3DFolder,
+				BuiltinResourcesHelper::AssetType::Sprite,
+				spriteIcons3DJSON);
 		}
 
 		if(!includesJSON.is_null())
@@ -366,6 +377,9 @@ namespace bs
 			if(!skinJSON.is_null())
 				dataListJSON["Skin"] = skinJSON;
 
+			if(!animatedSpritesJSON.is_null())
+				dataListJSON["AnimatedSprites"] = animatedSpritesJSON;
+
 			if(!cursorsJSON.is_null())
 				dataListJSON["Cursors"] = cursorsJSON;
 
@@ -374,6 +388,9 @@ namespace bs
 
 			if(!spriteIconsJSON.is_null())
 				dataListJSON["SpriteIcons"] = spriteIconsJSON;
+
+			if(!spriteIcons3DJSON.is_null())
+				dataListJSON["SpriteIcons3D"] = spriteIcons3DJSON;
 
 			if(!includesJSON.is_null())
 				dataListJSON["Includes"] = includesJSON;
@@ -397,8 +414,10 @@ namespace bs
 		}
 
 		const Path skinFolder = sOutputFolder + BuiltinResources::SKIN_FOLDER;
+		const Path animatedSpriteFolder = sOutputFolder + BuiltinResources::ANIMATED_SPRITES_FOLDER;
 		const Path cursorFolder = sOutputFolder + BuiltinResources::CURSOR_FOLDER;
 		const Path iconFolder = sOutputFolder + BuiltinResources::ICON_FOLDER;
+		const Path icon3DFolder = sOutputFolder + BuiltinResources::ICON3D_FOLDER;
 		const Path shaderFolder = sOutputFolder + BuiltinResources::SHADER_FOLDER;
 		const Path shaderIncludeFolder = sOutputFolder + BuiltinResources::SHADER_INCLUDE_FOLDER;
 		const Path shaderDependenciesFile = sInputFolder + DEPENDENCIES_JSON_NAME;
@@ -412,6 +431,9 @@ namespace bs
 			if(FileSystem::exists(iconFolder))
 				FileSystem::remove(iconFolder);
 
+			if(FileSystem::exists(icon3DFolder))
+				FileSystem::remove(icon3DFolder);
+
 			if(FileSystem::exists(shaderIncludeFolder))
 				FileSystem::remove(shaderIncludeFolder);
 
@@ -420,6 +442,9 @@ namespace bs
 
 			if(FileSystem::exists(skinFolder))
 				FileSystem::remove(skinFolder);
+
+			if(FileSystem::exists(animatedSpriteFolder))
+				FileSystem::remove(animatedSpriteFolder);
 			
 			FileSystem::remove(shaderDependenciesFile);
 		}
@@ -505,6 +530,31 @@ namespace bs
 				BuiltinResourcesHelper::AssetType::Sprite);
 		}
 
+		// Import 3D sprite icons
+		if(!spriteIcons3DJSON.is_null())
+		{
+			BuiltinResourcesHelper::updateManifest(
+				icon3DFolder,
+				spriteIcons3DJSON,
+				sManifest,
+				BuiltinResourcesHelper::AssetType::Sprite);
+
+			Vector<bool> importFlags = BuiltinResourcesHelper::generateImportFlags(
+				spriteIcons3DJSON,
+				rawIcon3DFolder,
+				lastUpdateTime,
+				forceImport);
+
+			BuiltinResourcesHelper::importAssets(
+				spriteIcons3DJSON,
+				importFlags,
+				rawIcon3DFolder,
+				icon3DFolder,
+				sManifest,
+				BuiltinResourcesHelper::AssetType::Sprite,
+				nullptr, false, true);
+		}
+
 		// Import shaders
 		if(!shadersJSON.is_null() && !includesJSON.is_null())
 		{
@@ -582,6 +632,30 @@ namespace bs
 				BuiltinResourcesHelper::AssetType::Sprite);
 		}
 
+		// Import animated sprites
+		if(!animatedSpritesJSON.is_null())
+		{
+			BuiltinResourcesHelper::updateManifest(
+				animatedSpriteFolder,
+				animatedSpritesJSON,
+				sManifest,
+				BuiltinResourcesHelper::AssetType::Sprite);
+
+			Vector<bool> importFlags = BuiltinResourcesHelper::generateImportFlags(
+				animatedSpritesJSON,
+				rawAnimatedSpritesFolder,
+				lastUpdateTime,
+				forceImport);
+
+			BuiltinResourcesHelper::importAssets(
+				animatedSpritesJSON,
+				importFlags,
+				rawAnimatedSpritesFolder,
+				animatedSpriteFolder,
+				sManifest,
+				BuiltinResourcesHelper::AssetType::Sprite);
+		}
+
 		// Update shader dependencies JSON
 		{
 			String jsonString = shaderDependenciesJSON.dump(4).c_str();
@@ -645,8 +719,8 @@ namespace bs
 			Path outputPath = sOutputFolder + (fileName + ".asset");
 
 			auto textureIO = gImporter().createImportOptions<TextureImportOptions>(inputPath);
-			textureIO->setCPUCached(true);
-			textureIO->setGenerateMipmaps(false);
+			textureIO->cpuCached = true;
+			textureIO->generateMips = false;
 			HTexture splashTexture = gImporter().import<Texture>(inputPath, textureIO);
 
 			SPtr<PixelData> splashPixelData = splashTexture->getProperties().allocBuffer(0, 0);

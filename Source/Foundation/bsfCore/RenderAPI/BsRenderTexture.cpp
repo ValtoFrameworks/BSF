@@ -6,6 +6,7 @@
 #include "Managers/BsTextureManager.h"
 #include "Resources/BsResources.h"
 #include "CoreThread/BsCoreThread.h"
+#include <Private/RTTI/BsRenderTargetRTTI.h>
 
 namespace bs
 {
@@ -172,13 +173,24 @@ namespace bs
 		return static_cast<const RenderTextureProperties&>(getPropertiesInternal());
 	}
 
+	/************************************************************************/
+	/* 								SERIALIZATION                      		*/
+	/************************************************************************/
+
+	RTTITypeBase* RenderTexture::getRTTIStatic()
+	{
+		return RenderTextureRTTI::instance();
+	}
+
+	RTTITypeBase* RenderTexture::getRTTI() const
+	{
+		return RenderTexture::getRTTIStatic();
+	}
+
 	namespace ct
 	{
 	RenderTexture::RenderTexture(const RENDER_TEXTURE_DESC& desc, UINT32 deviceIdx)
 		:mDesc(desc)
-	{ }
-
-	RenderTexture::~RenderTexture()
 	{ }
 
 	void RenderTexture::initialize()

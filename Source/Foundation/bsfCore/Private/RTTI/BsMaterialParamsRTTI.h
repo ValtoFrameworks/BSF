@@ -66,7 +66,7 @@ namespace bs
 
 		MaterialParamStructDataRTTI()
 		{
-			addDataBlockField("dataBuffer", 0, &MaterialParamStructDataRTTI::getDataBuffer, &MaterialParamStructDataRTTI::setDataBuffer, 0);
+			addDataBlockField("dataBuffer", 0, &MaterialParamStructDataRTTI::getDataBuffer, &MaterialParamStructDataRTTI::setDataBuffer);
 		}
 
 		const String& getRTTIName() override
@@ -104,10 +104,12 @@ namespace bs
 		void setParamData(MaterialParams* obj, UINT32 idx, MaterialParam& param)
 		{
 			UINT32 paramIdx = param.index;
-			if(paramIdx == (UINT32)-1)
-				paramIdx = (UINT32)obj->mParams.size();
 
-			obj->mParams.push_back(param.data);
+			// Older saved files might not have indices preserved
+			if(paramIdx == (UINT32)-1)
+				paramIdx = mNextParamIdx++;
+
+			obj->mParams[paramIdx] = param.data;
 			obj->mParamLookup[param.name] = paramIdx;
 		}
 
@@ -117,7 +119,9 @@ namespace bs
 		}
 
 		void setParamDataArraySize(MaterialParams* obj, UINT32 size)
-		{ }
+		{
+			obj->mParams.resize(size);
+		}
 
 		SPtr<DataStream> getDataBuffer(MaterialParams* obj, UINT32& size)
 		{
@@ -195,7 +199,7 @@ namespace bs
 			addPlainArrayField("paramData", 0, &MaterialParamsRTTI::getParamData, &MaterialParamsRTTI::getParamDataArraySize, 
 				&MaterialParamsRTTI::setParamData, &MaterialParamsRTTI::setParamDataArraySize);
 
-			addDataBlockField("dataBuffer", 1, &MaterialParamsRTTI::getDataBuffer, &MaterialParamsRTTI::setDataBuffer, 0);
+			addDataBlockField("dataBuffer", 1, &MaterialParamsRTTI::getDataBuffer, &MaterialParamsRTTI::setDataBuffer);
 
 			addReflectableArrayField("structParams", 2, &MaterialParamsRTTI::getStructParam,
 				&MaterialParamsRTTI::getStructArraySize, &MaterialParamsRTTI::setStructParam, &MaterialParamsRTTI::setStructArraySize);
@@ -284,6 +288,7 @@ namespace bs
 
 	private:
 		Vector<MaterialParam> mMatParams;
+		UINT32 mNextParamIdx = 0;
 	};
 
 	template<> struct RTTIPlainType<MaterialParamsBase::ParamData>

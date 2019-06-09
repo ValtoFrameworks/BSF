@@ -14,8 +14,6 @@
 namespace bs
 {
 	AnimationManager::AnimationManager()
-		: mNextId(1), mUpdateRate(1.0f / 60.0f), mAnimationTime(0.0f), mLastAnimationUpdateTime(0.0f)
-		, mNextAnimationUpdateTime(0.0f), mPaused(false), mPoseReadBufferIdx(1), mPoseWriteBufferIdx(0)
 	{
 		mBlendShapeVertexDesc = VertexDataDesc::create();
 		mBlendShapeVertexDesc->addVertElem(VET_FLOAT3, VES_POSITION, 1, 1);
@@ -72,9 +70,11 @@ namespace bs
 			for (auto& anim : mAnimations)
 			{
 				anim.second->updateFromProxy();
-				anim.second->triggerEvents(mAnimationTime, gTime().getFrameDelta());
+				anim.second->triggerEvents(mLastAnimationDeltaTime);
 			}
 		}
+
+		mLastAnimationDeltaTime = timeDelta;
 
 		// Update animation proxies from the latest data
 		mProxies.clear();
@@ -156,17 +156,21 @@ namespace bs
 			for (auto& anim : mAnimations)
 			{
 				anim.second->updateFromProxy();
-				anim.second->triggerEvents(mAnimationTime, gTime().getFrameDelta());
+				anim.second->triggerEvents(timeDelta);
 			}
 		}
 
 		mSwapBuffers = true;
 
-		return &mAnimData[mPoseReadBufferIdx];
+		if(!async)
+			return &mAnimData[mPoseWriteBufferIdx];
+		else
+			return &mAnimData[mPoseReadBufferIdx];
 	}
 
 	void AnimationManager::evaluateAnimation(AnimationProxy* anim, UINT32& curBoneIdx)
 	{
+		// Culling
 		if (anim->mCullEnabled)
 		{
 			bool isVisible = false;
@@ -180,9 +184,15 @@ namespace bs
 			}
 
 			if (!isVisible)
+			{
+				anim->wasCulled = true;
 				return;
+			}
 		}
 
+		anim->wasCulled = false;
+
+		// Evaluation
 		EvaluatedAnimationData& renderData = mAnimData[mPoseWriteBufferIdx];
 		
 		UINT32 prevPoseBufferIdx = (mPoseWriteBufferIdx + CoreThread::NUM_SYNC_BUFFERS) % (CoreThread::NUM_SYNC_BUFFERS + 1);

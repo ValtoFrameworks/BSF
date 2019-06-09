@@ -18,11 +18,6 @@ namespace bs
 
 	}
 
-	OAImporter::~OAImporter()
-	{
-
-	}
-
 	bool OAImporter::isExtensionSupported(const String& ext) const
 	{
 		String lowerCaseExt = ext;
@@ -55,13 +50,13 @@ namespace bs
 			String extension = filePath.getExtension();
 			StringUtil::toLowerCase(extension);
 
-			UPtr<AudioDecoder> reader(nullptr, nullptr);
+			UPtr<AudioDecoder> reader;
 			if (extension == u8".wav")
-				reader = bs_unique_ptr<AudioDecoder>(bs_new<WaveDecoder>());
+				reader = bs_unique_ptr_new<WaveDecoder>();
 			else if (extension == u8".flac")
-				reader = bs_unique_ptr<AudioDecoder>(bs_new<FLACDecoder>());
+				reader = bs_unique_ptr_new<FLACDecoder>();
 			else if (extension == u8".ogg")
-				reader = bs_unique_ptr<AudioDecoder>(bs_new<OggVorbisDecoder>());
+				reader = bs_unique_ptr_new<OggVorbisDecoder>();
 
 			if (reader == nullptr)
 				return nullptr;
@@ -82,7 +77,7 @@ namespace bs
 		SPtr<const AudioClipImportOptions> clipIO = std::static_pointer_cast<const AudioClipImportOptions>(importOptions);
 
 		// If 3D, convert to mono
-		if(clipIO->getIs3D() && info.numChannels > 1)
+		if(clipIO->is3D && info.numChannels > 1)
 		{
 			UINT32 numSamplesPerChannel = info.numSamples / info.numChannels;
 
@@ -101,14 +96,14 @@ namespace bs
 		}
 
 		// Convert bit depth if needed
-		if(clipIO->getBitDepth() != info.bitDepth)
+		if(clipIO->bitDepth != info.bitDepth)
 		{
-			UINT32 outBufferSize = info.numSamples * (clipIO->getBitDepth() / 8);
+			UINT32 outBufferSize = info.numSamples * (clipIO->bitDepth / 8);
 			UINT8* outBuffer = (UINT8*)bs_alloc(outBufferSize);
 
-			AudioUtility::convertBitDepth(sampleBuffer, info.bitDepth, outBuffer, clipIO->getBitDepth(), info.numSamples);
+			AudioUtility::convertBitDepth(sampleBuffer, info.bitDepth, outBuffer, clipIO->bitDepth, info.numSamples);
 
-			info.bitDepth = clipIO->getBitDepth();
+			info.bitDepth = clipIO->bitDepth;
 
 			bs_free(sampleBuffer);
 
@@ -117,7 +112,7 @@ namespace bs
 		}
 
 		// Encode to Ogg Vorbis if needed
-		if(clipIO->getFormat() == AudioFormat::VORBIS)
+		if(clipIO->format == AudioFormat::VORBIS)
 		{
 			// Note: If the original source was in Ogg Vorbis we could just copy it here, but instead we decode to PCM and
 			// then re-encode which is redundant. If later we decide to copy be aware that the engine encodes Ogg in a
@@ -132,11 +127,11 @@ namespace bs
 
 		AUDIO_CLIP_DESC clipDesc;
 		clipDesc.bitDepth = info.bitDepth;
-		clipDesc.format = clipIO->getFormat();
+		clipDesc.format = clipIO->format;
 		clipDesc.frequency = info.sampleRate;
 		clipDesc.numChannels = info.numChannels;
-		clipDesc.readMode = clipIO->getReadMode();
-		clipDesc.is3D = clipIO->getIs3D();
+		clipDesc.readMode = clipIO->readMode;
+		clipDesc.is3D = clipIO->is3D;
 
 		SPtr<AudioClip> clip = AudioClip::_createPtr(sampleStream, bufferSize, info.numSamples, clipDesc);
 

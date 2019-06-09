@@ -7,6 +7,7 @@
 
 namespace bs
 {
+	class PhysicsScene;
 	/** @addtogroup Physics
 	 *  @{
 	 */
@@ -179,8 +180,13 @@ namespace bs
 		/** Sets the drive's target linear and angular velocities. */
 		virtual void setDriveVelocity(const Vector3& linear, const Vector3& angular) = 0;
 
-		/** Creates a new D6 joint. */
-		static SPtr<D6Joint> create(const D6_JOINT_DESC& desc);
+		/** 
+		 * Creates a new D6 joint. 
+		 * 
+		 * @param[in]	scene		Scene to which to add the joint.
+		 * @param[in]	desc		Settings describing the joint.
+		 */
+		static SPtr<D6Joint> create(PhysicsScene& scene, const D6_JOINT_DESC& desc);
 	};
 
 	/** Structure used for initializing a new D6Joint. */
@@ -188,7 +194,7 @@ namespace bs
 	{
 		D6_JOINT_DESC() { }
 
-		D6JointMotion motion[(UINT32)D6JointAxis::Count];
+		D6JointMotion motion[(UINT32)D6JointAxis::Count] = { D6JointMotion::Locked };
 		D6JointDrive drive[(UINT32)D6JointDriveType::Count];
 		LimitLinear limitLinear;
 		LimitAngularRange limitTwist;

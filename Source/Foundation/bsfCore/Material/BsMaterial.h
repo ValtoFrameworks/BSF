@@ -149,6 +149,7 @@ namespace bs
 		 * technique is considered the default technique and which subset of techniques are searched during a call to 
 		 * findTechnique().
 		 */
+		BS_SCRIPT_EXPORT(n:Variation,pr:getter)
 		const ShaderVariation& getVariation() const { return mVariation; }
 
 		/** Returns the total number of techniques supported by this material. */
@@ -411,6 +412,13 @@ namespace bs
 		 */
 		BS_SCRIPT_EXPORT(n:GetMatrix4)
 		Matrix4 getMat4(const String& name, UINT32 arrayIdx = 0) const { return getParamMat4(name).get(arrayIdx); }
+
+		/** 
+		 * Checks does the data parameter with the specified name currently contains animated data. This could be 
+		 * an animation curve or a color gradient.
+		 */
+		BS_SCRIPT_EXPORT()
+		bool isAnimated(const String& name, UINT32 arrayIdx = 0);
 
 		/** Returns a texture assigned with the parameter with the specified name. */
 		TextureType getTexture(const String& name) const { return getParamTexture(name).get(); }
@@ -741,7 +749,8 @@ namespace bs
 		BS_SCRIPT_EXPORT(n:Shader,pr:setter)
 		void setShader(const HShader& shader);
 
-		/** @copydoc TMaterial<Core>::getVariation */
+		/** @copydoc TMaterial<Core>::getVariation() const */
+		BS_SCRIPT_EXPORT(n:Variation,pr:setter,hide)
 		void setVariation(const ShaderVariation& variation);
 
 		/** Retrieves an implementation of a material usable only from the core thread. */

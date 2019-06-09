@@ -244,7 +244,7 @@ namespace bs {	namespace ct
 		renderable->setRendererId(renderableId);
 
 		mInfo.renderables.push_back(bs_new<RendererRenderable>());
-		mInfo.renderableCullInfos.push_back(CullInfo(renderable->getBounds(), renderable->getLayer()));
+		mInfo.renderableCullInfos.push_back(CullInfo(renderable->getBounds(), renderable->getLayer(), renderable->getCullDistanceFactor()));
 
 		RendererRenderable* rendererRenderable = mInfo.renderables.back();
 		rendererRenderable->renderable = renderable;
@@ -347,7 +347,7 @@ namespace bs {	namespace ct
 						SPtr<GraphicsPipelineState> graphicsPipeline = pass->getGraphicsPipelineState();
 
 						SPtr<VertexDeclaration> shaderDecl = graphicsPipeline->getVertexProgram()->getInputDeclaration();
-						if (!vertexDecl->isCompatible(shaderDecl))
+						if (shaderDecl && !vertexDecl->isCompatible(shaderDecl))
 						{
 							Vector<VertexElement> missingElements = vertexDecl->getMissingElements(shaderDecl);
 
@@ -436,6 +436,7 @@ namespace bs {	namespace ct
 
 		mInfo.renderables[renderableId]->updatePerObjectBuffer();
 		mInfo.renderableCullInfos[renderableId].bounds = renderable->getBounds();
+		mInfo.renderableCullInfos[renderableId].cullDistanceFactor = renderable->getCullDistanceFactor();
 	}
 
 	void RendererScene::unregisterRenderable(Renderable* renderable)
@@ -1288,6 +1289,14 @@ namespace bs {	namespace ct
 		mInfo.renderableReady[idx] = true;
 	}
 
+	void RendererScene::prepareParticleSystem(UINT32 idx, const FrameInfo& frameInfo)
+	{
+		ParticlesRenderElement& renElement = mInfo.particleSystems[idx].renderElement;
+		renElement.material->updateParamsSet(renElement.params, 0.0f);
+		
+		mInfo.particleSystems[idx].perObjectParamBuffer->flushToGPU();
+	}
+
 	void RendererScene::prepareDecal(UINT32 idx, const FrameInfo& frameInfo)
 	{
 		DecalRenderElement& renElement = mInfo.decals[idx].renderElement;
@@ -1317,7 +1326,7 @@ namespace bs {	namespace ct
 				worldAABox.transformAffine(entry.localToWorld);
 
 			const Sphere worldSphere(worldAABox.getCenter(), worldAABox.getRadius());
-			mInfo.particleSystemCullInfos[rendererId] = Bounds(worldAABox, worldSphere);
+			mInfo.particleSystemCullInfos[rendererId].bounds = Bounds(worldAABox, worldSphere);
 		}
 	}
 

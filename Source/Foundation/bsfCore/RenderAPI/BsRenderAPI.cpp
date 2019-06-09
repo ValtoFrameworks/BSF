@@ -139,11 +139,6 @@ namespace bs
 		ct::RenderAPI::instance().convertProjectionMatrix(matrix, dest);
 	}
 
-	const RenderAPIInfo& RenderAPI::getAPIInfo()
-	{
-		return ct::RenderAPI::instance().getAPIInfo();
-	}
-
 	namespace ct
 	{
 	RenderAPI::RenderAPI()
@@ -166,6 +161,9 @@ namespace bs
 
 		RENDER_WINDOW_DESC windowDesc = primaryWindowDesc;
 		SPtr<bs::RenderWindow> renderWindow = bs::RenderWindow::create(windowDesc, nullptr);
+
+		// Make sure render window initialization is submitted to the internal queue
+		gCoreThread().submitAll();
 
 		gCoreThread().queueCommand(std::bind(&RenderAPI::initializeWithWindow, this, renderWindow->getCore()), 
 			CTQF_InternalQueue | CTQF_BlockUntilComplete);

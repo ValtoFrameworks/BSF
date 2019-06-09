@@ -15,7 +15,7 @@ namespace bs
 	/** Encodes the provided object to the specified file using the RTTI system. */
 	class BS_UTILITY_EXPORT FileEncoder
 	{
-		public:
+	public:
 		FileEncoder(const Path& fileLocation);
 		~FileEncoder();
 
@@ -56,6 +56,9 @@ namespace bs
 		 *							deserialization.
 		 */
 		SPtr<IReflectable> decode(SerializationContext* context = nullptr);
+
+		/** Gets the size in bytes of the next object in the file. Returns 0 if no next object. */
+		UINT32 getSize() const;
 
 		/** Skips over than object in the file. Calling decode() will decode the next object. */
 		void skip();

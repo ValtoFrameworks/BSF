@@ -66,13 +66,12 @@ namespace bs { namespace ct
 
 	void RenderBeast::initializeCore()
 	{
-		const RenderAPI& rapi = RenderAPI::instance();
-		const RenderAPIInfo& rapiInfo = rapi.getAPIInfo();
+		const RenderAPICapabilities& caps = gCaps();
 
 		if(
-			!rapiInfo.isFlagSet(RenderAPIFeatureFlag::Compute) ||
-			!rapiInfo.isFlagSet(RenderAPIFeatureFlag::LoadStore) ||
-			!rapiInfo.isFlagSet(RenderAPIFeatureFlag::TextureViews))
+			!caps.hasCapability(RSC_COMPUTE_PROGRAM) ||
+			!caps.hasCapability(RSC_LOAD_STORE) ||
+			!caps.hasCapability(RSC_TEXTURE_VIEWS))
 		{
 			mFeatureSet = RenderBeastFeatureSet::DesktopMacOS;
 		}
@@ -382,18 +381,21 @@ namespace bs { namespace ct
 		FrameInfo frameInfo(timings, perFrameData);
 
 		// Make sure any renderer tasks finish first, as rendering might depend on them
-		processTasks(false);
+		processTasks(false, timings.frameIdx);
 
 		// If any reflection probes were updated or added, we need to copy them over in the global reflection probe array
 		updateReflProbeArray();
 
-		// Update material animation times for all renderables
+		// Update material parameters & animation times for all renderables
 		for (UINT32 i = 0; i < sceneInfo.renderables.size(); i++)
 		{
 			RendererRenderable* renderable = sceneInfo.renderables[i];
 			for (auto& element : renderable->elements)
 				element.materialAnimationTime += timings.timeDelta;
 		}
+
+		for (UINT32 i = 0; i < sceneInfo.particleSystems.size(); i++)
+			mScene->prepareParticleSystem(i, frameInfo);
 
 		for (UINT32 i = 0; i < sceneInfo.decals.size(); i++)
 		{
@@ -694,7 +696,7 @@ namespace bs { namespace ct
 		viewDesc.visibleLayers = 0xFFFFFFFFFFFFFFFF;
 		viewDesc.nearPlane = 0.5f;
 		viewDesc.farPlane = 1000.0f;
-		viewDesc.flipView = !RenderAPI::instance().getAPIInfo().isFlagSet(RenderAPIFeatureFlag::UVYAxisUp);
+		viewDesc.flipView = gCaps().conventions.uvYAxis != Conventions::Axis::Up;
 
 		viewDesc.viewOrigin = position;
 		viewDesc.projTransform = projTransform;

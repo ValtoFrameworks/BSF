@@ -10,7 +10,7 @@
 namespace bs { namespace ct
 {
 	VulkanLayoutKey::VulkanLayoutKey(VkDescriptorSetLayoutBinding* bindings, UINT32 numBindings)
-		:numBindings(numBindings), bindings(bindings), layout(nullptr)
+		:numBindings(numBindings), bindings(bindings)
 	{ }
 
 	bool VulkanLayoutKey::operator==(const VulkanLayoutKey& rhs) const
@@ -64,7 +64,7 @@ namespace bs { namespace ct
 	{
 		size_t hash = 0;
 		for (UINT32 i = 0; i < numLayouts; i++)
-			hash_combine(hash, layouts[i]->getHash());
+			bs_hash_combine(hash, layouts[i]->getHash());
 
 		return hash;
 	}

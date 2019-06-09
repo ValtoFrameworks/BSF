@@ -89,6 +89,28 @@ namespace bs
 			vertexOffset + verticesPerArc * 2, indexOffset + indicesPerArc * 2, quality);
 	}
 
+	void ShapeMeshes3D::wireHemisphere(const Sphere& sphere, const SPtr<MeshData>& meshData, UINT32 vertexOffset, 
+		UINT32 indexOffset, UINT32 quality)
+	{
+		UINT32 requiredNumVertices, requiredNumIndices;
+		getNumElementsWireHemisphere(quality, requiredNumVertices, requiredNumIndices);
+
+		assert((vertexOffset + requiredNumVertices) <= meshData->getNumVertices());
+		assert((indexOffset + requiredNumIndices) <= meshData->getNumIndices());
+
+		UINT32 verticesPerArc = (quality + 1) * 5;
+		UINT32 indicesPerArc = (verticesPerArc - 1) * 2;
+
+		wireArc(sphere.getCenter(), sphere.getRadius(), Vector3::UNIT_X, Degree(0.0f), Degree(180.0f), meshData,
+			vertexOffset, indexOffset, quality);
+
+		wireArc(sphere.getCenter(), sphere.getRadius(), Vector3::UNIT_Y, Degree(0.0f), Degree(180.0f), meshData,
+			vertexOffset + verticesPerArc, indexOffset + indicesPerArc, quality);
+
+		wireDisc(sphere.getCenter(), sphere.getRadius(), Vector3::UNIT_Z, meshData,
+			vertexOffset + verticesPerArc * 2, indexOffset + indicesPerArc * 2, quality);
+	}
+
 	void ShapeMeshes3D::solidSphere(const Sphere& sphere, const SPtr<MeshData>& meshData, UINT32 vertexOffset, 
 		UINT32 indexOffset, UINT32 quality)
 	{
@@ -430,6 +452,13 @@ namespace bs
 		numIndices *= 3;
 	}
 
+	void ShapeMeshes3D::getNumElementsWireHemisphere(UINT32 quality, UINT32& numVertices, UINT32& numIndices)
+	{
+		getNumElementsWireArc(quality, numVertices, numIndices);
+		numVertices *= 3;
+		numIndices *= 3;
+	}
+
 	void ShapeMeshes3D::getNumElementsArc(UINT32 quality, UINT32& numVertices, UINT32& numIndices)
 	{
 		numVertices = ((quality + 1) * 5 + 1) * 2;
@@ -709,20 +738,23 @@ namespace bs
 		}
 
 		// Fix UV seams
+		UINT8* extraPositions = outVertices + curVertOffset * vertexStride;
+
+		UINT8* extraNormals = nullptr;
+		if (outNormals)
+			extraNormals = outNormals + curVertOffset * vertexStride;
+
+		UINT8* extraUV = nullptr;
+		if(outUV)
+			extraUV = outUV + curVertOffset * vertexStride;
+
+		const UINT32 maxExtraVerts = 3 * (UINT32)pow(4, quality);
+		UINT32 extraVertIdx = 0;
 		if (outUV != nullptr)
 		{
 			// Note: This only fixes seams for tileable textures. To properly fix seams for all textures the triangles
 			// would actually need to be split along the UV seam. This is ignored as non-tileable textures won't look
 			// good on a sphere regardless of the seam.
-			UINT32 extraVertIdx = 0;
-			UINT8* extraPositions = outVertices + curVertOffset * vertexStride;
-
-			UINT8* extraNormals = nullptr;
-			if(outNormals)
-				extraNormals = outNormals + curVertOffset * vertexStride;
-
-			UINT8* extraUV = outUV + curVertOffset * vertexStride;
-
 			for (UINT32 i = 0; i < numIndices; i += 3)
 			{
 				const Vector2& uv0 = *(Vector2*)&outUV[(i + 0) * vertexStride];
@@ -856,10 +888,22 @@ namespace bs
 
 					outIndices[i + indexToSplit] = vertexOffset + numIndices + extraVertIdx;
 
-					assert(extraVertIdx < (3 * pow(4, quality)));
+					assert(extraVertIdx < maxExtraVerts);
 					extraVertIdx++;
 				}
 			}
+		}
+
+		// Fill out the remaining extra vertices, just so they aren't uninitialized
+		for(; extraVertIdx < maxExtraVerts; extraVertIdx++)
+		{
+			extraPositions = writeVector3(extraPositions, vertexStride, sphere.getCenter());
+
+			if (extraNormals)
+				extraNormals = writeVector3(extraNormals, vertexStride, Vector3::UNIT_Z);
+
+			if(extraUV)
+				extraUV = writeVector2(extraUV, vertexStride, Vector2::ZERO);
 		}
 	}
 

@@ -80,7 +80,8 @@ namespace bs
 			const Map<String, SHADER_DATA_PARAM_DESC>& dataParams, 
 			const Map<String, SHADER_OBJECT_PARAM_DESC>& textureParams,
 			const Map<String, SHADER_OBJECT_PARAM_DESC>& bufferParams,
-			const Map<String, SHADER_OBJECT_PARAM_DESC>& samplerParams
+			const Map<String, SHADER_OBJECT_PARAM_DESC>& samplerParams,
+			UINT64 initialParamVersion
 		);
 
 		/** Constructor for serialization use only. */
@@ -518,11 +519,18 @@ namespace bs
 		using ParamBufferDataType = typename TMaterialParamsTypes<Core>::BufferParamDataType;
 		using ParamSamplerStateDataType = typename TMaterialParamsTypes<Core>::SamplerStateParamDataType;
 
-		/** Creates a new material params object and initializes enough room for parameters from the provided shader. */
-		TMaterialParams(const ShaderType& shader);
+		/**
+		 * Creates a new material params object and initializes enough room for parameters from the provided shader. 
+		 * 
+		 * @param[in]	shader					Shader containing the information about parameters and their types.
+		 * @param[in]	initialParamVersion		Initial version number to assign to the parameters. Usually relevant if
+		 *										you are replacing an existing MaterialParams object and wish to ensure
+		 *										version number keeps getting incremented.
+		 */
+		TMaterialParams(const ShaderType& shader, UINT64 initialParamVersion);
 
 		/** Constructor for serialization use only. */
-		TMaterialParams() { }
+		TMaterialParams() = default;
 
 		virtual ~TMaterialParams();
 
@@ -643,6 +651,12 @@ namespace bs
 		 * @param[in]	value		New value of the parameter.
 		 */
 		void setSamplerState(const String& name, const SamplerType& value);
+
+		/** 
+		 * Checks does the data parameter with the specified name currently contains animated data. This could be 
+		 * an animation curve or a color gradient.
+		 */
+		bool isAnimated(const String& name, UINT32 arrayIdx = 0);
 
 		/**
 		 * Equivalent to getStructData(const String&, UINT32, void*, UINT32) except it uses the internal parameter reference
@@ -796,8 +810,8 @@ namespace bs
 	class BS_CORE_EXPORT MaterialParams : public IReflectable, public TMaterialParams<false>
 	{
 	public:
-		/** @copydoc TMaterialParams::TMaterialParams(const ShaderType&) */
-		MaterialParams(const HShader& shader);
+		/** @copydoc TMaterialParams::TMaterialParams(const ShaderType&, UINT32) */
+		MaterialParams(const HShader& shader, UINT64 initialParamVersion = 1);
 
 		/** 
 		 * Populates the provided buffer with parameters that can be used for syncing this object with its core-thread
@@ -843,8 +857,8 @@ namespace bs
 		/** Initializes the core thread version of MaterialParams from its sim thread counterpart. */
 		MaterialParams(const SPtr<Shader>& shader, const SPtr<bs::MaterialParams>& params);
 		
-		/** @copydoc TMaterialParams::TMaterialParams(const ShaderType&) */
-		MaterialParams(const SPtr<Shader>& shader);
+		/** @copydoc TMaterialParams::TMaterialParams(const ShaderType&, UINT32) */
+		MaterialParams(const SPtr<Shader>& shader, UINT64 initialParamVersion = 1);
 
 		/** 
 		 * Updates the stored parameters from the provided buffer, allowing changes to be transfered between the sim and 

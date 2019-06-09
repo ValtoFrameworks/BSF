@@ -95,6 +95,12 @@ namespace bs
 		 */
 		void setUseOverrideBounds(bool enable);
 
+		/** Factor to be applied to the cull distance set in the camera's render settings.  */
+		void setCullDistanceFactor(float factor);
+
+		/** @copydoc setCullDistanceFactor() */
+		float getCullDistanceFactor() const { return mCullDistanceFactor; }
+
 		/** @copydoc setLayer() */
 		UINT64 getLayer() const { return mLayer; }
 
@@ -102,7 +108,7 @@ namespace bs
 		MeshType getMesh() const { return mMesh; }
 
 		/**	Returns the material used for rendering a sub-mesh with the specified index. */
-		MaterialType getMaterial(UINT32 idx) const { return mMaterials[idx]; }
+		MaterialType getMaterial(UINT32 idx) const;
 
 		/**	Returns the transform matrix that is applied to the object when its being rendered. */
 		Matrix4 getMatrix() const { return mTfrmMatrix; }
@@ -132,6 +138,7 @@ namespace bs
 		UINT64 mLayer = 1;
 		AABox mOverrideBounds;
 		bool mUseOverrideBounds = false;
+		float mCullDistanceFactor = 1.0f;
 		Matrix4 mTfrmMatrix = BsIdentity;
 		Matrix4 mTfrmMatrixNoScale = BsIdentity;
 		RenderableAnimType mAnimType = RenderableAnimType::None;

@@ -414,10 +414,18 @@ namespace bs
 					else
 						textureCore = nullptr;
 
+					SPtr<ct::SpriteTexture> spriteTextureCore;
+					if (entry.matInfo.spriteTexture.isLoaded())
+						spriteTextureCore = entry.matInfo.spriteTexture->getCore();
+					else
+						spriteTextureCore = nullptr;
+
 					newEntry.material = entry.material;
 					newEntry.mesh = mesh->getCore();
 					newEntry.texture = textureCore;
+					newEntry.spriteTexture = spriteTextureCore;
 					newEntry.tint = entry.matInfo.tint;
+					newEntry.animationStartTime = entry.matInfo.animationStartTime;
 					newEntry.worldTransform = entry.widget->getWorldTfrm();
 					newEntry.additionalData = entry.matInfo.additionalData;
 
@@ -431,6 +439,8 @@ namespace bs
 
 			mCoreDirty = false;
 		}
+
+		gCoreThread().queueCommand(std::bind(&ct::GUIRenderer::update, mRenderer.get(), gTime().getTime()));
 	}
 
 	void GUIManager::processDestroyQueue()
@@ -522,58 +532,60 @@ namespace bs
 					//    overlap the current elements bounds.
 					GUIMaterialGroup* foundGroup = nullptr;
 
-					for (auto groupIter = groupsPerMaterial.rbegin(); groupIter != groupsPerMaterial.rend(); ++groupIter)
+					if(spriteMaterial->allowBatching())
 					{
-						// If we separate meshes by widget, ignore any groups with widget parents other than mine
-						if (mSeparateMeshesByWidget)
+						for (auto groupIter = groupsPerMaterial.rbegin(); groupIter != groupsPerMaterial.rend(); ++groupIter)
 						{
-							if (groupIter->elements.size() > 0)
+							// If we separate meshes by widget, ignore any groups with widget parents other than mine
+							if (mSeparateMeshesByWidget)
 							{
-								GUIElement* otherElem = groupIter->elements.begin()->element; // We only need to check the first element
-								if (otherElem->_getParentWidget() != guiElem->_getParentWidget())
-									continue;
-							}
-						}
-
-						GUIMaterialGroup& group = *groupIter;
-
-						if (group.depth == elemDepth)
-						{
-							foundGroup = &group;
-							break;
-						}
-						else
-						{
-							UINT32 startDepth = elemDepth;
-							UINT32 endDepth = group.depth;
-
-							Rect2I potentialGroupBounds = group.bounds;
-							potentialGroupBounds.encapsulate(tfrmedBounds);
-
-							bool foundOverlap = false;
-							for (auto& material : materialGroups)
-							{
-								for (auto& matGroup : material.second)
+								if (groupIter->elements.size() > 0)
 								{
-									if (&matGroup == &group)
+									GUIElement* otherElem = groupIter->elements.begin()->element; // We only need to check the first element
+									if (otherElem->_getParentWidget() != guiElem->_getParentWidget())
 										continue;
-
-									if ((matGroup.minDepth >= startDepth && matGroup.minDepth <= endDepth)
-										|| (matGroup.depth >= startDepth && matGroup.depth <= endDepth))
-									{
-										if (matGroup.bounds.overlaps(potentialGroupBounds))
-										{
-											foundOverlap = true;
-											break;
-										}
-									}
 								}
 							}
 
-							if (!foundOverlap)
+							GUIMaterialGroup& group = *groupIter;
+							if (group.depth == elemDepth)
 							{
 								foundGroup = &group;
 								break;
+							}
+							else
+							{
+								UINT32 startDepth = elemDepth;
+								UINT32 endDepth = group.depth;
+
+								Rect2I potentialGroupBounds = group.bounds;
+								potentialGroupBounds.encapsulate(tfrmedBounds);
+
+								bool foundOverlap = false;
+								for (auto& material : materialGroups)
+								{
+									for (auto& matGroup : material.second)
+									{
+										if (&matGroup == &group)
+											continue;
+
+										if ((matGroup.minDepth >= startDepth && matGroup.minDepth <= endDepth)
+											|| (matGroup.depth >= startDepth && matGroup.depth <= endDepth))
+										{
+											if (matGroup.bounds.overlaps(potentialGroupBounds))
+											{
+												foundOverlap = true;
+												break;
+											}
+										}
+									}
+								}
+
+								if (!foundOverlap)
+								{
+									foundGroup = &group;
+									break;
+								}
 							}
 						}
 					}
@@ -723,7 +735,7 @@ namespace bs
 					renderData.lineMesh = Mesh::_createPtr(meshData[1], MU_STATIC, DOT_LINE_LIST);
 			}
 
-			bs_frame_clear();			
+			bs_frame_clear();
 		}
 	}
 
@@ -1049,8 +1061,8 @@ namespace bs
 		mNewElementsInFocus.clear();
 
 		mCommandEvent = GUICommandEvent();
-		mCommandEvent.setType(GUICommandEventType::FocusGained);
 
+		// Determine elements that gained focus
 		for (auto& elementInfo : mElementsUnderPointer)
 		{
 			auto iterFind = std::find_if(begin(mElementsInFocus), end(mElementsInFocus),
@@ -1058,7 +1070,7 @@ namespace bs
 
 			if (iterFind == mElementsInFocus.end())
 			{
-				bool processed = sendCommandEvent(elementInfo.element, mCommandEvent);
+				bool processed = !elementInfo.element->getOptionFlags().isSet(GUIElementOption::ClickThrough);
 				mNewElementsInFocus.push_back(ElementFocusInfo(elementInfo.element, elementInfo.widget, processed));
 
 				if (processed)
@@ -1073,7 +1085,7 @@ namespace bs
 			}
 		}
 
-		// Determine elements that lost focus
+		// Send focus loss events
 		// Note: Focus loss must trigger before mouse press because things like input boxes often only confirm changes
 		// made to them when focus is lost. So if the user is confirming some input via a press of the button focus loss
 		// must trigger on the input box first to make sure its contents get saved.
@@ -1085,9 +1097,19 @@ namespace bs
 				[=](const ElementFocusInfo& x) { return x.element == elementInfo.element; });
 
 			if (iterFind == mNewElementsInFocus.end())
-			{
 				sendCommandEvent(elementInfo.element, mCommandEvent);
-			}
+		}
+
+		// Send focus gain events
+		mCommandEvent.setType(GUICommandEventType::FocusGained);
+
+		for(auto& elementInfo : mNewElementsInFocus)
+		{
+			auto iterFind = std::find_if(begin(mElementsInFocus), end(mElementsInFocus),
+				[=](const ElementFocusInfo& x) { return x.element == elementInfo.element; });
+
+			if (iterFind == mElementsInFocus.end())
+				sendCommandEvent(elementInfo.element, mCommandEvent);
 		}
 
 		mElementsInFocus.swap(mNewElementsInFocus);
@@ -1667,8 +1689,8 @@ namespace bs
 			float x = vecLocalPos.x - (float)bridgeBounds.x;
 			float y = vecLocalPos.y - (float)bridgeBounds.y;
 
-			float scaleX = rtProps.width / (float)bridgeBounds.width;
-			float scaleY = rtProps.height / (float)bridgeBounds.height;
+			float scaleX = bridgeBounds.width > 0 ? rtProps.width / (float)bridgeBounds.width : 0.0f;
+			float scaleY = bridgeBounds.height > 0 ? rtProps.height / (float)bridgeBounds.height : 0.0f;
 
 			return Vector2I(Math::roundToInt(x * scaleX), Math::roundToInt(y * scaleY));
 		}
@@ -1868,7 +1890,7 @@ namespace bs
 
 		float invViewportWidth = 1.0f / (camera.getViewport()->getPixelArea().width * 0.5f);
 		float invViewportHeight = 1.0f / (camera.getViewport()->getPixelArea().height * 0.5f);
-		float viewflipYFlip = bs::RenderAPI::getAPIInfo().isFlagSet(RenderAPIFeatureFlag::NDCYAxisDown) ? -1.0f : 1.0f;
+		float viewflipYFlip = (gCaps().conventions.ndcYAxis == Conventions::Axis::Down) ? -1.0f : 1.0f;
 
 		for (auto& entry : renderData)
 		{
@@ -1877,6 +1899,22 @@ namespace bs
 			gGUISpriteParamBlockDef.gInvViewportWidth.set(buffer, invViewportWidth);
 			gGUISpriteParamBlockDef.gInvViewportHeight.set(buffer, invViewportHeight);
 			gGUISpriteParamBlockDef.gViewportYFlip.set(buffer, viewflipYFlip);
+
+			float t = std::max(0.0f, mTime - entry.animationStartTime);
+			if(entry.spriteTexture)
+			{
+				UINT32 row;
+				UINT32 column;
+				entry.spriteTexture->getAnimationFrame(t, row, column);
+
+				float invWidth = 1.0f / entry.spriteTexture->getAnimation().numColumns;
+				float invHeight = 1.0f / entry.spriteTexture->getAnimation().numRows;
+
+				Vector4 sizeOffset(invWidth, invHeight, column * invWidth, row * invHeight);
+				gGUISpriteParamBlockDef.gUVSizeOffset.set(buffer, sizeOffset);
+			}
+			else
+				gGUISpriteParamBlockDef.gUVSizeOffset.set(buffer, Vector4(1.0f, 1.0f, 0.0f, 0.0f));
 
 			buffer->flushToGPU();
 		}
@@ -1890,6 +1928,11 @@ namespace bs
 
 			entry.material->render(entry.mesh, entry.subMesh, entry.texture, mSamplerState, buffer, entry.additionalData);
 		}
+	}
+
+	void GUIRenderer::update(float time)
+	{
+		mTime = time;
 	}
 
 	void GUIRenderer::updateData(const UnorderedMap<SPtr<Camera>, Vector<GUIManager::GUICoreRenderData>>& newPerCameraData)

@@ -361,6 +361,12 @@ namespace bs
 		return TMaterialParamSampState<Core>(name, getMaterialPtr(this));
 	}
 
+	template <bool Core>
+	bool TMaterial<Core>::isAnimated(const String& name, UINT32 arrayIdx)
+	{
+		return mParams->isAnimated(name, arrayIdx);
+	}
+
 	template<bool Core>
 	void TMaterial<Core>::initializeTechniques()
 	{
@@ -657,7 +663,8 @@ namespace bs
 
 	CoreSyncData Material::syncToCore(FrameAlloc* allocator)
 	{
-		const bool syncAllParams = (getCoreDirtyFlags() & (UINT32)MaterialDirtyFlags::ParamResource) != 0;
+		const UINT32 dirtyParam = (UINT32)MaterialDirtyFlags::Param;
+		const bool syncAllParams = (getCoreDirtyFlags() & ~dirtyParam) != 0;
 
 		UINT32 paramsSize = 0;
 		if (mParams != nullptr)
@@ -977,6 +984,8 @@ namespace bs
 	HMaterial Material::create()
 	{
 		const SPtr<Material> materialPtr = createEmpty();
+		materialPtr->initialize();
+
 		return static_resource_cast<Material>(gResources()._createResourceHandle(materialPtr));
 	}
 
@@ -1048,6 +1057,7 @@ namespace bs
 		bool syncAllParams;
 		dataPtr = rttiReadElem(syncAllParams, dataPtr);
 
+		UINT64 initialParamVersion = mParams != nullptr ? mParams->getParamVersion() : 1;
 		if(syncAllParams)
 			mParams = nullptr;
 
@@ -1072,7 +1082,7 @@ namespace bs
 		UINT32 paramsSize = 0;
 		dataPtr = rttiReadElem(paramsSize, dataPtr);
 		if (mParams == nullptr && mShader != nullptr)
-			mParams = bs_shared_ptr_new<MaterialParams>(mShader);
+			mParams = bs_shared_ptr_new<MaterialParams>(mShader, initialParamVersion);
 
 		if(mParams != nullptr && paramsSize > 0)
 			mParams->setSyncData((UINT8*)dataPtr, paramsSize);

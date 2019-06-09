@@ -9,21 +9,12 @@
 
 namespace bs
 {
-	AnimationClipInfo::AnimationClipInfo()
-		: playbackType(AnimPlaybackType::Normal), fadeDirection(0.0f), fadeTime(0.0f), fadeLength(0.0f), curveVersion(0)
-		, layerIdx((UINT32)-1), stateIdx((UINT32)-1)
-	{ }
-
 	AnimationClipInfo::AnimationClipInfo(const HAnimationClip& clip)
-		: clip(clip), playbackType(AnimPlaybackType::Normal), fadeDirection(0.0f), fadeTime(0.0f), fadeLength(0.0f)
-		, curveVersion(0), layerIdx((UINT32)-1), stateIdx((UINT32)-1)
+		: clip(clip) 
 	{ }
 
 	AnimationProxy::AnimationProxy(UINT64 id)
-		: id(id), layers(nullptr), numLayers(0), numSceneObjects(0), sceneObjectInfos(nullptr)
-		, sceneObjectTransforms(nullptr), morphChannelInfos(nullptr), morphShapeInfos(nullptr), numMorphChannels(0)
-		, numMorphShapes(0), numMorphVertices(0), morphChannelWeightsDirty(false), mCullEnabled(true), numGenericCurves(0)
-		, genericCurveOutputs(nullptr)
+		: id(id)
 	{ }
 
 	AnimationProxy::~AnimationProxy()
@@ -641,8 +632,6 @@ namespace bs
 	}
 
 	Animation::Animation()
-		: mDefaultWrapMode(AnimWrapMode::Loop), mDefaultSpeed(1.0f), mCull(true), mDirty(AnimDirtyStateFlag::All)
-		, mGenericCurveValuesValid(false)
 	{
 		mId = AnimationManager::instance().registerAnimation(this);
 		mAnimProxy = bs_shared_ptr_new<AnimationProxy>(mId);
@@ -1202,7 +1191,7 @@ namespace bs
 		return mClipInfos[idx].clip;
 	}
 
-	void Animation::triggerEvents(float lastFrameTime, float delta)
+	void Animation::triggerEvents(float delta)
 	{
 		for (auto& clipInfo : mClipInfos)
 		{
@@ -1212,27 +1201,41 @@ namespace bs
 			const Vector<AnimationEvent>& events = clipInfo.clip->getEvents();
 			bool loop = clipInfo.state.wrapMode == AnimWrapMode::Loop;
 
-			float start = lastFrameTime;
-			float end = start + delta;
-
+			float start = std::max(clipInfo.state.time - delta, 0.0f);
+			float end = clipInfo.state.time;
 			float clipLength = clipInfo.clip->getLength();
-			AnimationUtility::wrapTime(start, 0.0f, clipLength, loop);
-			AnimationUtility::wrapTime(end, 0.0f, clipLength, loop);
 
-			if (start < end)
+			float wrappedStart = start;
+			float wrappedEnd = end;
+			AnimationUtility::wrapTime(wrappedStart, 0.0f, clipLength, loop);
+			AnimationUtility::wrapTime(wrappedEnd, 0.0f, clipLength, loop);
+
+			if(!loop)
 			{
 				for (auto& event : events)
 				{
-					if (event.time > start && event.time <= end)
+					if (event.time >= wrappedStart && (event.time < wrappedEnd || 
+						(event.time == clipLength && start < clipLength && end >= clipLength)))
 						onEventTriggered(clipInfo.clip, event.name);
 				}
 			}
-			else if(end < start) // End is looped, but start is not
+			else
 			{
-				for (auto& event : events)
+				if (wrappedStart < wrappedEnd)
 				{
-					if (event.time > start && event.time < clipLength && event.time > 0 && event.time <= end)
-						onEventTriggered(clipInfo.clip, event.name);
+					for (auto& event : events)
+					{
+						if (event.time >= wrappedStart && event.time < wrappedEnd)
+							onEventTriggered(clipInfo.clip, event.name);
+					}
+				}
+				else if (wrappedEnd < wrappedStart) // End is looped, but start is not
+				{
+					for (auto& event : events)
+					{
+						if ((event.time >= wrappedStart && event.time <= clipLength) || (event.time >= 0 && event.time < wrappedEnd))
+							onEventTriggered(clipInfo.clip, event.name);
+					}
 				}
 			}
 		}
@@ -1388,6 +1391,10 @@ namespace bs
 		// means (e.g. for the purposes of recording new keyframes if running from the editor).
 		const bool disableSOUpdates = mAnimProxy->sampleStep == AnimSampleStep::Done;
 		if(disableSOUpdates)
+			return;
+
+		// If the object was culled, then we have no valid data to read back
+		if(mAnimProxy->wasCulled)
 			return;
 
 		HSceneObject rootSO;

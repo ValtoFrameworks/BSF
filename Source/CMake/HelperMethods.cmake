@@ -7,35 +7,51 @@ function(add_prefix var prefix)
 endfunction()
 
 function(add_engine_dependencies target_name)
-	add_engine_dependencies2(${target_name} FALSE)
+	add_engine_dependencies2(${target_name} ${BUILD_ALL_RENDER_API})
 endfunction()
 
 function(add_engine_dependencies2 target_name all_render_api)
 	if(${all_render_api})
 		if(WIN32)
-			add_dependencies(${target_name} bsfD3D11RenderAPI bsfVulkanRenderAPI bsfGLRenderAPI)
+			add_dependencies(${target_name} bsfD3D11RenderAPI bsfVulkanRenderAPI bsfGLRenderAPI bsfNullRenderAPI)
 		elseif(APPLE)
-			add_dependencies(${target_name} bsfGLRenderAPI)
+			add_dependencies(${target_name} bsfGLRenderAPI bsfNullRenderAPI)
 		else()
-			add_dependencies(${target_name} bsfVulkanRenderAPI bsfGLRenderAPI)
+			add_dependencies(${target_name} bsfVulkanRenderAPI bsfGLRenderAPI bsfNullRenderAPI)
 		endif()
 	else()
 		if(RENDER_API_MODULE MATCHES "DirectX 11")
 			add_dependencies(${target_name} bsfD3D11RenderAPI)
 		elseif(RENDER_API_MODULE MATCHES "Vulkan")
 			add_dependencies(${target_name} bsfVulkanRenderAPI)
-		else()
+		elseif(RENDER_API_MODULE MATCHES "OpenGL")
 			add_dependencies(${target_name} bsfGLRenderAPI)
+		else()
+			add_dependencies(${target_name} bsfNullRenderAPI)
 		endif()
 	endif()
 
 	if(AUDIO_MODULE MATCHES "FMOD")
 		add_dependencies(${target_name} bsfFMOD)
-	else() # Default to OpenAudio
+	elseif(AUDIO_MODULE MATCHES "OpenAudio")
 		add_dependencies(${target_name} bsfOpenAudio)
+	else()
+		add_dependencies(${target_name} bsfNullAudio)
 	endif()
 	
-	add_dependencies(${target_name} bsfSL bsfPhysX bsfRenderBeast)
+	if(PHYSICS_MODULE MATCHES "PhysX")
+		add_dependencies(${target_name} bsfPhysX)
+	else()
+		add_dependencies(${target_name} bsfNullPhysics)
+	endif()
+	
+	if(RENDERER_MODULE MATCHES "RenderBeast")
+		add_dependencies(${target_name} bsfRenderBeast)
+	else()
+		add_dependencies(${target_name} bsfNullRenderer)
+	endif()
+	
+	add_dependencies(${target_name} bsfSL)
 endfunction()
 
 function(add_importer_dependencies target_name)
@@ -93,14 +109,8 @@ MACRO(add_imported_library LIB_NAME RELEASE_NAME DEBUG_NAME IS_SHARED)
 		add_library(${LIB_NAME} STATIC IMPORTED)
 	endif()
 
-	if(CMAKE_CONFIGURATION_TYPES) # Multiconfig generator?
-		set_target_properties(${LIB_NAME} PROPERTIES IMPORTED_LOCATION_DEBUG "${DEBUG_NAME}")
-		set_target_properties(${LIB_NAME} PROPERTIES IMPORTED_LOCATION_RELWITHDEBINFO "${RELEASE_NAME}")
-		set_target_properties(${LIB_NAME} PROPERTIES IMPORTED_LOCATION_MINSIZEREL "${RELEASE_NAME}")
-		set_target_properties(${LIB_NAME} PROPERTIES IMPORTED_LOCATION_RELEASE "${RELEASE_NAME}")
-	else()
-		set_target_properties(${LIB_NAME} PROPERTIES IMPORTED_LOCATION "${RELEASE_NAME}")
-	endif()
+	set_target_properties(${LIB_NAME} PROPERTIES IMPORTED_LOCATION "${RELEASE_NAME}")
+	set_target_properties(${LIB_NAME} PROPERTIES IMPORTED_LOCATION_DEBUG "${DEBUG_NAME}")
 ENDMACRO()
 
 MACRO(find_imported_library3 FOLDER_NAME LIB_NAME DEBUG_LIB_NAME IS_SHARED)
@@ -133,7 +143,7 @@ MACRO(find_imported_library3 FOLDER_NAME LIB_NAME DEBUG_LIB_NAME IS_SHARED)
 ENDMACRO()
 
 MACRO(find_imported_library_shared2 FOLDER_NAME LIB_NAME DEBUG_LIB_NAME)
-		list(APPEND ${FOLDER_NAME}_SHARED_LIBS ${LIB_NAME})
+	list(APPEND ${FOLDER_NAME}_SHARED_LIBS ${LIB_NAME})
 	find_imported_library3(${FOLDER_NAME} ${LIB_NAME} ${DEBUG_LIB_NAME} TRUE)
 ENDMACRO()
 
@@ -187,8 +197,11 @@ function(install_dependency_binary FILE_PATH CONFIG)
 		return()
 	endif()
 
-	get_filename_component(FILE_NAME ${FILE_PATH} NAME_WE)
-
+	get_filename_component(FILE_NAME ${FILE_PATH} NAME)
+	
+	# Remove shortest extension (CMake built-in method removes longest)
+	string(REGEX REPLACE "\\.[^.]*$" "" FILE_NAME ${FILE_NAME})
+	
 	if(WIN32)
 		if(BS_64BIT)
 			set(PLATFORM "x64")
@@ -198,8 +211,13 @@ function(install_dependency_binary FILE_PATH CONFIG)
 
 		set(FULL_FILE_NAME ${FILE_NAME}.dll)
 
-		set(SRC_PATH "${PROJECT_SOURCE_DIR}/bin/${PLATFORM}/${CONFIG}/${FULL_FILE_NAME}")
-		set(DEST_DIR bin)
+		set(SRC_PATH "${BSF_SOURCE_DIR}/../bin/${PLATFORM}/${CONFIG}/${FULL_FILE_NAME}")
+
+		if(NOT BS_IS_BANSHEE3D)
+			set(DEST_DIR bin)
+		else()
+			set(DEST_DIR .)
+		endif()
 	else()
 		# Check if there are so-versioned files in the source directory, and if so use the filename including
 		# the major soversion, because that's what the linker will use.
@@ -222,7 +240,12 @@ function(install_dependency_binary FILE_PATH CONFIG)
 		endif()
 
 		set(SRC_PATH ${FILE_PATH})
-		set(DEST_DIR lib/bsf-${BS_FRAMEWORK_VERSION_MAJOR}.${BS_FRAMEWORK_VERSION_MINOR}.${BS_FRAMEWORK_VERSION_PATCH})
+		
+		if(NOT BS_IS_BANSHEE3D)
+			set(DEST_DIR lib/bsf-${BS_FRAMEWORK_VERSION_MAJOR}.${BS_FRAMEWORK_VERSION_MINOR}.${BS_FRAMEWORK_VERSION_PATCH})
+		else()
+			set(DEST_DIR lib/b3d-${BS_B3D_VERSION_MAJOR}.${BS_B3D_VERSION_MINOR}.${BS_B3D_VERSION_PATCH})
+		endif()
 	endif()
 
 	if(CONFIG MATCHES "Release")
@@ -246,6 +269,38 @@ MACRO(install_dependency_binaries FOLDER_NAME)
 	endforeach()
 ENDMACRO()
 
+# Dependency .dll install is handled automatically if the imported .lib has the same name as the .dll
+# and the .dll is in the project root bin folder. Otherwise you need to call this manually.
+MACRO(install_dependency_dll FOLDER_NAME SRC_DIR LIB_NAME)
+	if(BS_64BIT)
+		set(PLATFORM "x64")
+	else()
+		set(PLATFORM "x86")
+	endif()
+
+	if(NOT BS_IS_BANSHEE3D)
+		set(BIN_DIR bin)
+	else()
+		set(BIN_DIR .)
+	endif()
+
+	set(FULL_FILE_NAME ${LIB_NAME}.dll)
+	set(SRC_RELEASE "${SRC_DIR}/bin/${PLATFORM}/Release/${FULL_FILE_NAME}")
+	set(SRC_DEBUG "${SRC_DIR}/bin/${PLATFORM}/Debug/${FULL_FILE_NAME}")
+	
+	install(
+		FILES ${SRC_RELEASE}
+		DESTINATION ${BIN_DIR}
+		CONFIGURATIONS Release RelWithDebInfo MinSizeRel
+	)
+		
+	install(
+		FILES ${SRC_DEBUG}
+		DESTINATION ${BIN_DIR}
+		CONFIGURATIONS Debug
+	)
+ENDMACRO()
+
 function(target_link_framework TARGET FRAMEWORK)
 	find_library(FM_${FRAMEWORK} ${FRAMEWORK})
 
@@ -260,7 +315,7 @@ endfunction()
 set(BS_BINARY_DEP_WEBSITE "https://data.banshee3d.com" CACHE STRING "The location that binary dependencies will be pulled from. Must follow the same naming scheme as data.banshee3d.com")
 mark_as_advanced(BS_BINARY_DEP_WEBSITE)
 
-function(update_binary_deps DEP_PREFIX DEP_FOLDER DEP_VERSION)
+function(update_binary_deps DEP_PREFIX DEP_NAME DEP_FOLDER DEP_VERSION)
 	# Clean and create a temporary folder
 	execute_process(COMMAND ${CMAKE_COMMAND} -E remove_directory ${PROJECT_SOURCE_DIR}/Temp)	
 	execute_process(COMMAND ${CMAKE_COMMAND} -E make_directory ${PROJECT_SOURCE_DIR}/Temp)	
@@ -273,7 +328,7 @@ function(update_binary_deps DEP_PREFIX DEP_FOLDER DEP_VERSION)
 		set(DEP_TYPE macOS)
 	endif()
 
-	set(BINARY_DEPENDENCIES_URL ${BS_BINARY_DEP_WEBSITE}/${DEP_PREFIX}Dependencies_${DEP_TYPE}_Master_${DEP_VERSION}.zip)
+	set(BINARY_DEPENDENCIES_URL ${BS_BINARY_DEP_WEBSITE}/${DEP_PREFIX}_${DEP_TYPE}_Master_${DEP_VERSION}.zip)
 	file(DOWNLOAD ${BINARY_DEPENDENCIES_URL} ${PROJECT_SOURCE_DIR}/Temp/Dependencies.zip 
 		SHOW_PROGRESS
 		STATUS DOWNLOAD_STATUS)
@@ -290,26 +345,28 @@ function(update_binary_deps DEP_PREFIX DEP_FOLDER DEP_VERSION)
 	)
 	
 	# Copy executables and dynamic libraries
-	execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${PROJECT_SOURCE_DIR}/Temp/bin ${DEP_FOLDER}/../bin)	
+	if(EXISTS ${PROJECT_SOURCE_DIR}/Temp/bin)
+		execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${PROJECT_SOURCE_DIR}/Temp/bin ${DEP_FOLDER}/../bin)	
+	endif()
 	
 	# Copy static libraries, headers and tools
 	execute_process(COMMAND ${CMAKE_COMMAND} -E remove_directory ${DEP_FOLDER})	
-	execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${PROJECT_SOURCE_DIR}/Temp/Dependencies ${DEP_FOLDER})
+	execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${PROJECT_SOURCE_DIR}/Temp/${DEP_NAME} ${DEP_FOLDER})
 	
 	# Clean up
 	execute_process(COMMAND ${CMAKE_COMMAND} -E remove_directory ${PROJECT_SOURCE_DIR}/Temp)	
 endfunction()
 
-function(check_and_update_binary_deps DEP_PREFIX DEP_FOLDER DEP_VERSION)
+function(check_and_update_binary_deps DEP_PREFIX DEP_NAME DEP_FOLDER DEP_VERSION)
 	set(BUILTIN_DEP_VERSION_FILE ${DEP_FOLDER}/.version)
 	if(NOT EXISTS ${BUILTIN_DEP_VERSION_FILE})
 		message(STATUS "Binary dependencies for '${DEP_PREFIX}' are missing. Downloading package...")
-		update_binary_deps(${DEP_PREFIX} ${DEP_FOLDER} ${DEP_VERSION})
+		update_binary_deps(${DEP_PREFIX} ${DEP_NAME} ${DEP_FOLDER} ${DEP_VERSION})
 	else()
 		file (STRINGS ${BUILTIN_DEP_VERSION_FILE} CURRENT_DEP_VERSION)
 		if(${DEP_VERSION} GREATER ${CURRENT_DEP_VERSION})
 			message(STATUS "Your precomiled dependencies package for '${DEP_PREFIX}' is out of date. Downloading latest package...")
-			update_binary_deps(${DEP_PREFIX} ${DEP_FOLDER} ${DEP_VERSION})
+			update_binary_deps(${DEP_PREFIX} ${DEP_NAME} ${DEP_FOLDER} ${DEP_VERSION})
 		endif()
 	endif()
 endfunction()
@@ -355,18 +412,29 @@ endfunction()
 function(install_bsf_target targetName)
 	strip_symbols(${targetName} symbolsFile)
 	
-	install(
-		TARGETS ${targetName}
-		EXPORT bsf
-		RUNTIME DESTINATION bin
-		LIBRARY DESTINATION lib
-		ARCHIVE DESTINATION lib
-	)		
+	if(NOT BS_IS_BANSHEE3D)
+		set(BIN_DIR bin)
+		install(
+			TARGETS ${targetName}
+			EXPORT bsf
+			RUNTIME DESTINATION ${BIN_DIR}
+			LIBRARY DESTINATION lib
+			ARCHIVE DESTINATION lib
+		)
+	else()
+		set(BIN_DIR .)
+		install(
+			TARGETS ${targetName}
+			EXPORT bsf
+			RUNTIME DESTINATION ${BIN_DIR}
+			LIBRARY DESTINATION lib
+		)
+	endif()
 	
 	if(MSVC)
 		install(
 			FILES $<TARGET_PDB_FILE:${targetName}> 
-			DESTINATION bin 
+			DESTINATION ${BIN_DIR}
 			OPTIONAL
 		)
 	else()
@@ -377,30 +445,90 @@ function(install_bsf_target targetName)
 	endif()
 endfunction()
 
-function(copyBsfBinaries target srcDir)
-	if(WIN32)
-		set(BIN_SRC_DIR "${srcDir}/bin")
-		set(BIN_DST_DIR ${PROJECT_BINARY_DIR}/bin)
-		
-		file(GLOB_RECURSE BIN_FILES RELATIVE ${BIN_SRC_DIR} "${BIN_SRC_DIR}/*.dll")
+function(install_binaries_on_build target srcDir subDir extension)
+	set(BIN_SRC_DIR "${srcDir}/${subDir}")
+	set(BIN_DST_DIR ${PROJECT_BINARY_DIR}/${subDir})
 
-		foreach(CUR_PATH ${BIN_FILES})
-			get_filename_component(FILENAME ${CUR_PATH} NAME)
-		
-			if(FILENAME MATCHES "^bsf.*")
-				continue()
-			endif()
-		
-			set(SRC ${BIN_SRC_DIR}/${CUR_PATH})
-			set(DST ${BIN_DST_DIR}/${CUR_PATH})
-			add_custom_command(
-			   TARGET ${target} POST_BUILD
-			   COMMAND ${CMAKE_COMMAND}
-			   ARGS    -E copy_if_different ${SRC} ${DST}
-			   COMMENT "Copying ${SRC} ${DST}\n"
-			   )
-		endforeach()
+	file(GLOB_RECURSE BIN_FILES RELATIVE ${BIN_SRC_DIR} "${BIN_SRC_DIR}/*.${extension}")
+
+	foreach(CUR_PATH ${BIN_FILES})
+		get_filename_component(FILENAME ${CUR_PATH} NAME)
+
+		if(FILENAME MATCHES "^bsf.*")
+			continue()
+		endif()
+
+		set(SRC ${BIN_SRC_DIR}/${CUR_PATH})
+		set(DST ${BIN_DST_DIR}/${CUR_PATH})
+		add_custom_command(
+			TARGET ${target} POST_BUILD
+			COMMAND ${CMAKE_COMMAND}
+			ARGS    -E copy_if_different ${SRC} ${DST}
+			COMMENT "Copying ${SRC} ${DST}"
+		)
+	endforeach()
+endfunction()
+
+function(install_dll_on_build target srcDir)
+	if(WIN32)
+		install_binaries_on_build(${target} ${srcDir} bin dll)
 	endif()
+endfunction()
+
+function(install_dylib_on_build target srcDir)
+	if(APPLE)
+		install_binaries_on_build(${target} ${srcDir} lib dylib)
+	endif()
+endfunction()
+
+function(copy_folder_on_build target srcDir dstDir name filter)
+	set(SRC_DIR ${srcDir}/${name})
+	set(DST_DIR ${dstDir}/${name})
+	
+	file(GLOB_RECURSE ALL_FILES RELATIVE ${SRC_DIR} "${SRC_DIR}/${filter}")
+
+	foreach(CUR_PATH ${ALL_FILES})
+		get_filename_component(FILENAME ${CUR_PATH} NAME)
+	
+		set(SRC ${SRC_DIR}/${CUR_PATH})
+		set(DST ${DST_DIR}/${CUR_PATH})
+		add_custom_command(
+		   TARGET ${target} POST_BUILD
+		   COMMAND ${CMAKE_COMMAND}
+		   ARGS    -E copy_if_different ${SRC} ${DST}
+		   COMMENT "Copying ${SRC} ${DST}"
+		   )
+	endforeach()
+endfunction()
+
+function(generate_csharp_project folder project_name namespace assembly refs projectRefs)
+	file(GLOB_RECURSE ALL_FILES RELATIVE ${folder} ${folder}/*.cs)
+		
+	set(BS_SHARP_FILE_LIST "")
+	foreach(CUR_FILE ${ALL_FILES})
+		if(CUR_FILE MATCHES "obj/")
+			continue()
+		endif()
+	
+		string(REGEX REPLACE "/" "\\\\" CUR_FILE_PATH ${CUR_FILE})
+		string(APPEND BS_SHARP_FILE_LIST "\t<Compile Include=\"${CUR_FILE_PATH}\"/>\n")
+	endforeach()
+
+	set(BS_SHARP_ROOT_NS ${namespace})
+	set(BS_SHARP_ASSEMBLY_NAME ${assembly})
+	
+	if(BS_IS_BANSHEE3D)
+		set(BS_SHARP_DEFINES "IS_B3D;")
+	endif()
+
+	string(REGEX REPLACE "/" "\\\\" BINARY_DIR_PATH ${PROJECT_BINARY_DIR})
+	set(BS_SHARP_ASSEMBLY_OUTPUT "${BINARY_DIR_PATH}\\bin\\Assemblies")
+	set(BS_SHARP_PROJECT_REFS ${projectRefs})
+	set(BS_SHARP_REFS ${refs})
+
+	configure_file(
+		${folder}/${project_name}.csproj.in
+		${folder}/${BS_SHARP_ASSEMBLY_NAME}.csproj)
 endfunction()
 
 function(add_common_flags target)
@@ -578,7 +706,7 @@ function(add_run_asset_import_target _PREFIX _FOLDER _WORKING_DIR _ARGS)
 	else()
 		set(RunAssetImport_EXECUTABLE ${bsfImportTool_EXECUTABLE})
 		set(RunAssetImport_INPUT_FOLDER ${_FOLDER})
-		set(RunAssetImport_CMD_ARGS ${__ARGS})
+		set(RunAssetImport_CMD_ARGS ${_ARGS})
 		set(RunAssetImport_PREFIX ${_PREFIX})
 		set(RunAssetImport_WORKING_DIR ${_WORKING_DIR})
 		

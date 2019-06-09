@@ -750,16 +750,7 @@
             "Path": "PerCameraData.bslinc"
         }
     ],
-    "SpriteImageAlpha.bsl": [
-        {
-            "Path": "SpriteImage.bslinc"
-        }
-    ],
-    "SpriteImageNoAlpha.bsl": [
-        {
-            "Path": "SpriteImage.bslinc"
-        }
-    ],
+    "SpriteImage.bsl": null,
     "SpriteLine.bsl": null,
     "SpriteText.bsl": null,
     "TetrahedraRender.bsl": [

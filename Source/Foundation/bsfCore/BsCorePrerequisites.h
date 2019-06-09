@@ -70,7 +70,11 @@
   */
 
 /** @defgroup Particles Particles
-  *	Emission, updated and rendering of particles in the particle system.
+  *	Emission, updates and rendering of particles in the particle system.
+  */
+
+/** @defgroup Network Network
+  * Sending and receiving data over the network.
   */
 
 /** @cond RTTI */
@@ -133,6 +137,10 @@
 
 /** @defgroup Particles-Internal Particles
  *	Emission, updates and rendering of particles in the particle system.
+ */
+
+/** @defgroup Network-Internal Network
+ * Sending and receiving data over the network.
  */
 
 /** @defgroup Physics-Internal Physics
@@ -335,7 +343,6 @@ namespace bs
 	class Input;
 	struct PointerEvent;
 	class RendererFactory;
-	class AsyncOp;
 	class HardwareBufferManager;
 	class FontManager;
 	class RenderStateManager;
@@ -412,6 +419,7 @@ namespace bs
 	class SceneObject;
 	class Component;
 	class SceneManager;
+	class SceneInstance;
 	// RTTI
 	class MeshRTTI;
 	// Desc structs
@@ -458,15 +466,6 @@ namespace bs
 		class RenderStateManager;
 		class HardwareBufferManager;
 	}
-}
-
-/************************************************************************/
-/* 						         Typedefs								*/
-/************************************************************************/
-
-namespace bs
-{
-	typedef TCoreThreadQueue<CommandQueueNoSync> CoreThreadQueue;
 }
 
 /************************************************************************/
@@ -637,6 +636,11 @@ namespace bs
 		TID_ParticleRotation = 1190,
 		TID_Decal = 1191,
 		TID_CDecal = 1192,
+		TID_RenderTarget = 1193,
+		TID_RenderTexture = 1194,
+		TID_RenderWindow = 1195,
+		TID_ShaderVariationParamInfo = 1196,
+		TID_ShaderVariationParamValue = 1197,
 
 		// Moved from Engine layer
 		TID_CCamera = 30000,
@@ -711,6 +715,7 @@ namespace bs
 	typedef GameObjectHandle<CSphereCollider> HSphereCollider;
 	typedef GameObjectHandle<CCapsuleCollider> HCapsuleCollider;
 	typedef GameObjectHandle<CPlaneCollider> HPlaneCollider;
+	typedef GameObjectHandle<CMeshCollider> HMeshCollider;
 	typedef GameObjectHandle<CJoint> HJoint;
 	typedef GameObjectHandle<CHingeJoint> HHingeJoint;
 	typedef GameObjectHandle<CSliderJoint> HSliderJoint;
@@ -758,8 +763,8 @@ namespace bs
 	template <typename T, typename A = StdAlloc<T, ProfilerAlloc>>
 	using ProfilerStack = std::stack<T, std::deque<T, A>>;
 
-	/** Banshee thread policy that performs special startup/shutdown on threads managed by thread pool. */
-	class BS_CORE_EXPORT ThreadBansheePolicy
+	/** Default thread policy for the framework. Performs special startup/shutdown on threads managed by thread pool. */
+	class BS_CORE_EXPORT ThreadDefaultPolicy
 	{
 	public:
 		static void onThreadStarted(const String& name)
@@ -816,7 +821,7 @@ namespace bs
 		 * Used when deserializing resources. Lets the system know not to discard any intermediate resource data that might
 		 * be required if the resource needs to be serialized.
 		 */
-		SF_KeepResourceSourceData
+		SF_KeepResourceSourceData = 1
 	};
 
 	/** Helper type that can contain either a component or scene actor version of an object. */

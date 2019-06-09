@@ -526,6 +526,7 @@ namespace bs
 
 	bool isShiftPressed = false;
 	bool isCtrlPressed = false;
+	bool isAltPressed = false;
 
 	/**	Translate engine non client area to win32 non client area. */
 	LRESULT translateNonClientAreaType(NonClientAreaBorderType type)
@@ -755,8 +756,7 @@ namespace bs
 			((MINMAXINFO*)lParam)->ptMinTrackSize.y = 100;
 
 			// Ensure maximizes window has proper size and doesn't cover the entire screen
-			const POINT ptZero = { 0, 0 };
-			HMONITOR primaryMonitor = MonitorFromPoint(ptZero, MONITOR_DEFAULTTOPRIMARY);
+			HMONITOR primaryMonitor = MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST);
 
 			MONITORINFO monitorInfo;
 			monitorInfo.cbSize = sizeof(MONITORINFO);
@@ -974,6 +974,12 @@ namespace bs
 					break;
 				}
 
+				if(wParam == VK_MENU)
+				{
+					isAltPressed = true;
+					break;
+				}
+
 				InputCommandType command = InputCommandType::Backspace;
 				if(getCommand((unsigned int)wParam, command))
 				{
@@ -989,14 +995,13 @@ namespace bs
 		case WM_KEYUP:
 			{
 				if(wParam == VK_SHIFT)
-				{
 					isShiftPressed = false;
-				}
 
 				if(wParam == VK_CONTROL)
-				{
 					isCtrlPressed = false;
-				}
+
+				if(wParam == VK_MENU)
+					isAltPressed = false;
 
 				return 0;
 			}
@@ -1007,6 +1012,10 @@ namespace bs
 				// Ignore rarely used special command characters, usually triggered by ctrl+key
 				// combinations. (We want to keep ctrl+key free for shortcuts instead)
 				if (wParam <= 23)
+					break;
+
+				// Ignore shortcut key combinations
+				if(isCtrlPressed || isAltPressed)
 					break;
 
 				switch (wParam) 

@@ -82,8 +82,10 @@ namespace bs
 		 * Signals an end of the currently sampled frame. Results of the sampling will be available once
 		 * getNumAvailableReports increments. This may take a while as the sampling is scheduled on the core thread and
 		 * on the GPU.
+		 * 
+		 * @param[in]	 discard		If true, the results of the frame will not be resolved and it will be discarded.
 		 */
-		void endFrame();
+		void endFrame(bool discard = false);
 
 		/**
 		 * Begins sample measurement. Must be followed by endSample().
@@ -158,15 +160,15 @@ namespace bs
 
 	private:
 		ProfiledSample mFrameSample;
-		bool mIsFrameActive;
+		bool mIsFrameActive = false;
 		Stack<ProfiledSample*> mActiveSamples;
 
 		Queue<ProfiledSample> mUnresolvedFrames;
-		GPUProfilerReport* mReadyReports;
+		GPUProfilerReport* mReadyReports = nullptr;
 
 		static const UINT32 MAX_QUEUE_ELEMENTS;
-		UINT32 mReportHeadPos;
-		UINT32 mReportCount;
+		UINT32 mReportHeadPos = 0;
+		UINT32 mReportCount = 0;
 
 		PoolAlloc<sizeof(ProfiledSample), 256> mSamplePool;
 

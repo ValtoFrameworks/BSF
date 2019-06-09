@@ -85,7 +85,7 @@ namespace bs { namespace ct
 			INT32 actualFormat;
 			UINT8* data;
 
-			Status status = XRRGetOutputProperty(x11Display, mOutputID, outputProps[k], 0, 100, False,
+			Status status = XRRGetOutputProperty(x11Display, mOutputID, outputProps[k], 0, 128, False,
 					False, AnyPropertyType, &actualType, &actualFormat, &numItems, &bytesAfter, &data);
 			if(status == Success)
 			{
@@ -97,7 +97,7 @@ namespace bs { namespace ct
 					{
 						UINT8* nameSrc = &data[idx + 5];
 
-						char name[13];
+						char name[14];
 						for(UINT32 m = 0; m < 13; m++)
 						{
 							if(nameSrc[m] == 0x0a)
@@ -111,6 +111,7 @@ namespace bs { namespace ct
 								name[m] = nameSrc[m];
 						}
 
+						name[13] = '\0';
 						mName = String(name);
 					}
 				}
@@ -163,8 +164,8 @@ namespace bs { namespace ct
 			if(screenRes->modes[k].id == currentMode)
 			{
 				mDesktopVideoMode = new (bs_alloc<LinuxVideoMode>())
-						LinuxVideoMode(mVideoModes[k]->getWidth(), mVideoModes[k]->getHeight(),
-						mVideoModes[k]->getRefreshRate(), mVideoModes[k]->getOutputIdx(), currentMode);
+						LinuxVideoMode(mVideoModes[k]->width, mVideoModes[k]->height,
+						mVideoModes[k]->refreshRate, mVideoModes[k]->outputIdx, currentMode);
 				break;
 			}
 		}
@@ -177,6 +178,6 @@ namespace bs { namespace ct
 	LinuxVideoMode::LinuxVideoMode(UINT32 width, UINT32 height, float refreshRate, UINT32 outputIdx, RRMode modeID)
 		:VideoMode(width, height, refreshRate, outputIdx), mModeID(modeID)
 	{
-		mIsCustom = false;
+		isCustom = false;
 	}
 }}

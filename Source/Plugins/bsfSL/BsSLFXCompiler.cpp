@@ -286,6 +286,34 @@ namespace bs
 		return HTexture();
 	}
 
+	UINT32 getStructSize(INT32 structIdx, const std::vector<Xsc::Reflection::Struct>& structLookup)
+	{
+		if(structIdx < 0 || structIdx >= (INT32)structLookup.size())
+			return 0;
+
+		UINT32 size = 0;
+
+		const Xsc::Reflection::Struct& structInfo = structLookup[structIdx];
+		for(auto& entry : structInfo.members)
+		{
+			if(entry.type == Xsc::Reflection::VariableType::Variable)
+			{
+				// Note: We're ignoring any padding. Since we can't guarantee the padding will be same for structs across
+				// different render backends it's expected for the user to set up structs in such a way so padding is not
+				// needed (i.e. add padding variables manually).
+				GpuParamDataType type = ReflTypeToDataType((Xsc::Reflection::DataType)entry.baseType);
+
+				const GpuParamDataTypeInfo& typeInfo = GpuParams::PARAM_SIZES.lookup[(int)type];
+				size += typeInfo.numColumns * typeInfo.numRows * typeInfo.baseTypeSize * entry.arraySize;
+
+			}
+			else if(entry.type == Xsc::Reflection::VariableType::Struct)
+				size += getStructSize(entry.baseType, structLookup);
+		}
+
+		return size;
+	}
+
 	TextureAddressingMode parseTexAddrMode(Xsc::Reflection::TextureAddressMode addrMode)
 	{
 		switch (addrMode)
@@ -419,10 +447,10 @@ namespace bs
 			String ident = entry.ident.c_str();
 			switch(entry.type)
 			{
-			case Xsc::Reflection::UniformType::UniformBuffer:
+			case Xsc::Reflection::VariableType::UniformBuffer:
 				desc.setParamBlockAttribs(entry.ident.c_str(), false, GBU_STATIC);
 				break;
-			case Xsc::Reflection::UniformType::Buffer:
+			case Xsc::Reflection::VariableType::Buffer:
 				{
 					GpuParamObjectType objType = ReflTypeToTextureType((Xsc::Reflection::BufferType)entry.baseType);
 					if(objType != GPOT_UNKNOWN)
@@ -453,7 +481,7 @@ namespace bs
 					}
 				}
 				break;
-			case Xsc::Reflection::UniformType::Sampler:
+			case Xsc::Reflection::VariableType::Sampler:
 			{
 				auto findIter = reflData.samplerStates.find(entry.ident);
 				if (findIter != reflData.samplerStates.end())
@@ -487,7 +515,7 @@ namespace bs
 				}
 				break;
 			}
-			case Xsc::Reflection::UniformType::Variable:
+			case Xsc::Reflection::VariableType::Variable:
 			{
 				bool isBlockInternal = false;
 				if(entry.uniformBlock != -1)
@@ -495,7 +523,7 @@ namespace bs
 					std::string blockName = reflData.constantBuffers[entry.uniformBlock].ident;
 					for (auto& uniform : reflData.uniforms)
 					{
-						if (uniform.type == Xsc::Reflection::UniformType::UniformBuffer && uniform.ident == blockName)
+						if (uniform.type == Xsc::Reflection::VariableType::UniformBuffer && uniform.ident == blockName)
 						{
 							isBlockInternal = (uniform.flags & Xsc::Reflection::Uniform::Flags::Internal) != 0;
 							break;
@@ -512,13 +540,15 @@ namespace bs
 						type = GPDT_COLOR;
 					}
 
+					UINT32 arraySize = entry.arraySize;
+
 					if (entry.defaultValue == -1)
-						desc.addParameter(SHADER_DATA_PARAM_DESC(ident, ident, type));
+						desc.addParameter(SHADER_DATA_PARAM_DESC(ident, ident, type, StringID::NONE, arraySize));
 					else
 					{
 						const Xsc::Reflection::DefaultValue& defVal = reflData.defaultValues[entry.defaultValue];
 
-						desc.addParameter(SHADER_DATA_PARAM_DESC(ident, ident, type, StringID::NONE, 1, 0), 
+						desc.addParameter(SHADER_DATA_PARAM_DESC(ident, ident, type, StringID::NONE, arraySize, 0), 
 							(UINT8*)defVal.matrix);
 					}
 
@@ -534,7 +564,14 @@ namespace bs
 				}
 			}
 				break;
-			case Xsc::Reflection::UniformType::Struct:
+			case Xsc::Reflection::VariableType::Struct:
+			{
+				INT32 structIdx = entry.baseType;
+				UINT32 structSize = getStructSize(structIdx, reflData.structs);
+
+				desc.addParameter(SHADER_DATA_PARAM_DESC(ident, ident, GPDT_STRUCT, StringID::NONE, entry.arraySize,
+					structSize));
+			}
 				break;
 			default: ;
 			}
@@ -546,7 +583,8 @@ namespace bs
 	{
 		GLSL45,
 		GLSL41,
-		VKSL45
+		VKSL45,
+		MVKSL
 	};
 
 	String crossCompile(const String& hlsl, GpuProgramType type, CrossCompileOutput outputType, bool optionalEntry,
@@ -554,11 +592,20 @@ namespace bs
 	{
 		SPtr<StringStream> input = bs_shared_ptr_new<StringStream>();
 
-		bool isVulkan = outputType == CrossCompileOutput::VKSL45;
-		if (isVulkan)
-			*input << "#define VULKAN 1" << std::endl;
-		else
+		bool isVKSL = outputType == CrossCompileOutput::VKSL45 || outputType == CrossCompileOutput::MVKSL;
+		switch(outputType)
+		{
+		case CrossCompileOutput::GLSL41:
+		case CrossCompileOutput::GLSL45:
 			*input << "#define OPENGL 1" << std::endl;
+			break;
+		case CrossCompileOutput::VKSL45:
+			*input << "#define VULKAN 1" << std::endl;
+			break;
+		case CrossCompileOutput::MVKSL:
+			*input << "#define METAL 1" << std::endl;
+			break;
+		}
 
 		*input << hlsl;
 
@@ -601,11 +648,12 @@ namespace bs
 
 		Xsc::ShaderOutput outputDesc;
 		outputDesc.sourceCode = &output;
-		outputDesc.options.autoBinding = isVulkan;
+		outputDesc.options.autoBinding = isVKSL;
 		outputDesc.options.autoBindingStartSlot = startBindingSlot;
 		outputDesc.options.fragmentLocations = true;
 		outputDesc.options.separateShaders = true;
-		outputDesc.options.separateSamplers = false;
+		outputDesc.options.separateSamplers = isVKSL;
+		outputDesc.options.allowExtensions = true;
 		outputDesc.nameMangling.inputPrefix = "bs_";
 		outputDesc.nameMangling.outputPrefix = "bs_";
 		outputDesc.nameMangling.useAlwaysSemantics = true;
@@ -620,6 +668,9 @@ namespace bs
 			outputDesc.shaderVersion = Xsc::OutputShaderVersion::GLSL410;
 			break;
 		case CrossCompileOutput::VKSL45:
+			outputDesc.shaderVersion = Xsc::OutputShaderVersion::VKSL450;
+			break;
+		case CrossCompileOutput::MVKSL:
 			outputDesc.shaderVersion = Xsc::OutputShaderVersion::VKSL450;
 			break;
 		}
@@ -701,8 +752,7 @@ namespace bs
 		return output.str();
 	}
 
-	// Convert HLSL code to GLSL
-	String HLSLtoGLSL(const String& hlsl, GpuProgramType type, CrossCompileOutput outputType, UINT32& startBindingSlot)
+	String crossCompile(const String& hlsl, GpuProgramType type, CrossCompileOutput outputType, UINT32& startBindingSlot)
 	{
 		return crossCompile(hlsl, type, outputType, false, startBindingSlot);
 	}
@@ -899,9 +949,21 @@ namespace bs
 			case OT_Identifier:
 				variationData.identifier = option->value.strValue;
 				break;
-			case OT_VariationValue:
-				variationData.values.push_back(option->value.intValue);
+			case OT_VariationOption:
+				variationData.values.push_back(parseVariationOption(option->value.nodePtr));
 				break;
+			case OT_Attributes:
+				{
+				AttributeData attribs = parseAttributes(option->value.nodePtr);
+
+				for (auto& entry : attribs.attributes)
+				{
+					if (entry.first == OT_AttrName)
+						variationData.name = entry.second;
+					else if(entry.first == OT_AttrShow)
+						variationData.internal = false;
+				}
+				}
 			default:
 				break;
 			}
@@ -909,6 +971,60 @@ namespace bs
 
 		if (!variationData.identifier.empty())
 			metaData.variations.push_back(variationData);
+	}
+
+	BSLFXCompiler::VariationOption BSLFXCompiler::parseVariationOption(ASTFXNode* variationOption)
+	{
+		assert(variationOption->type == NT_VariationOption);
+
+		VariationOption output;
+		for (int i = 0; i < variationOption->options->count; i++)
+		{
+			NodeOption* option = &variationOption->options->entries[i];
+
+			switch (option->type)
+			{
+			case OT_VariationValue:
+				output.value = option->value.intValue;
+				break;
+			case OT_Attributes:
+				{
+					AttributeData attribs = parseAttributes(option->value.nodePtr);
+
+					for(auto& entry : attribs.attributes)
+					{
+						if(entry.first == OT_AttrName)
+							output.name = entry.second;
+					}
+				}
+			default:
+				break;
+			}
+		}
+
+		return output;
+	}
+
+	BSLFXCompiler::AttributeData BSLFXCompiler::parseAttributes(ASTFXNode* attributes)
+	{
+		assert(attributes->type == NT_Attributes);
+
+		AttributeData attributeData;
+		for (int i = 0; i < attributes->options->count; i++)
+		{
+			NodeOption* option = &attributes->options->entries[i];
+
+			switch (option->type)
+			{
+			case OT_AttrName:
+				attributeData.attributes.push_back(std::pair<INT32, String>(OT_AttrName, option->value.strValue));
+				break;
+			default:
+				break;
+			}
+		}
+
+		return attributeData;
 	}
 
 	QueueSortType BSLFXCompiler::parseSortType(CullAndSortModeValue sortType)
@@ -1660,6 +1776,28 @@ namespace bs
 		return output;
 	}
 
+	void BSLFXCompiler::populateVariationParamInfos(const ShaderMetaData& shaderMetaData, SHADER_DESC& desc)
+	{
+		for(auto& entry : shaderMetaData.variations)
+		{
+			ShaderVariationParamInfo paramInfo;
+			paramInfo.internal = entry.internal;
+			paramInfo.name = entry.name;
+			paramInfo.identifier = entry.identifier;
+
+			for(auto& value : entry.values)
+			{
+				ShaderVariationParamValue paramValue;
+				paramValue.name = value.name;
+				paramValue.value = value.value;
+
+				paramInfo.values.add(paramValue);
+			}
+
+			desc.variationParams.push_back(paramInfo);
+		}
+	}
+
 	BSLFXCompileResult BSLFXCompiler::compileTechniques(
 		const Vector<std::pair<ASTFXNode*, ShaderMetaData>>& shaderMetaData, const String& source,
 		const UnorderedMap<String, String>& defines, ShadingLanguageFlags languages, SHADER_DESC& shaderDesc, 
@@ -1726,7 +1864,7 @@ namespace bs
 							for (UINT32 i = 0; i < (UINT32)current->values.size(); i++)
 							{
 								ShaderVariation variation;
-								variation.addParam(ShaderVariation::Param(current->identifier, current->values[i]));
+								variation.addParam(ShaderVariation::Param(current->identifier, current->values[i].value));
 
 								variations.push_back(variation);
 							}
@@ -1739,12 +1877,12 @@ namespace bs
 								for (UINT32 j = 1; j < (UINT32)current->values.size(); j++)
 								{
 									ShaderVariation copy = variations[i];
-									copy.addParam(ShaderVariation::Param(current->identifier, current->values[j]));
+									copy.addParam(ShaderVariation::Param(current->identifier, current->values[j].value));
 
 									variations.push_back(copy);
 								}
 
-								variations[i].addParam(ShaderVariation::Param(current->identifier, current->values[0]));
+								variations[i].addParam(ShaderVariation::Param(current->identifier, current->values[0].value));
 							}
 						}
 					}
@@ -1891,6 +2029,15 @@ namespace bs
 
 		if (!output.errorMessage.empty())
 			return output;
+
+		// Note: Must be called after populateVariations, to ensure variations from mixins are inherited
+		for(auto& entry : shaderMetaData)
+		{
+			if(entry.second.isMixin)
+				continue;
+
+			populateVariationParamInfos(entry.second, shaderDesc);
+		}
 
 		output = compileTechniques(shaderMetaData, source, defines, languages, shaderDesc, includes);
 
@@ -2079,7 +2226,7 @@ namespace bs
 
 		parseStateDelete(parseState);
 
-		// Parse extended HLSL code and generate per-program code, also convert to GLSL/VKSL
+		// Parse extended HLSL code and generate per-program code, also convert to GLSL/VKSL/MSL
 		const auto end = (UINT32)shaderData.size();
 		Vector<pair<ASTFXNode*, ShaderData>> outputShaderData;
 		for(UINT32 i = 0; i < end; i++)
@@ -2106,6 +2253,9 @@ namespace bs
 			ShaderData vkslShaderData = shaderData[i].second;
 			vkslShaderData.metaData.language = "vksl";
 
+			ShaderData mvksl = shaderData[i].second;
+			mvksl.metaData.language = "mvksl";
+
 			const auto numPasses = (UINT32)shaderDataEntry.passes.size();
 			for(UINT32 j = 0; j < numPasses; j++)
 			{
@@ -2118,83 +2268,46 @@ namespace bs
 				Vector<GpuProgramType> types;
 				reflectHLSL(passData.code, shaderDesc, types);
 
-				if(languages.isSet(ShadingLanguageFlag::GLSL))
+				auto crossCompilePass = [&types](PassData& passData, CrossCompileOutput language)
 				{
-					PassData& glslPassData = glslShaderData.passes[j];
-					UINT32 glslBinding = 0;
+					UINT32 binding = 0;
 
 					for (auto& type : types)
 					{
 						switch (type)
 						{
 						case GPT_VERTEX_PROGRAM:
-							glslPassData.vertexCode = HLSLtoGLSL(glslPassData.code, GPT_VERTEX_PROGRAM,
-								glslVersion, glslBinding);
+							passData.vertexCode = crossCompile(passData.code, GPT_VERTEX_PROGRAM, language, binding);
 							break;
 						case GPT_FRAGMENT_PROGRAM:
-							glslPassData.fragmentCode = HLSLtoGLSL(glslPassData.code, GPT_FRAGMENT_PROGRAM,
-								glslVersion, glslBinding);
+							passData.fragmentCode = crossCompile(passData.code, GPT_FRAGMENT_PROGRAM, language, binding);
 							break;
 						case GPT_GEOMETRY_PROGRAM:
-							glslPassData.geometryCode = HLSLtoGLSL(glslPassData.code, GPT_GEOMETRY_PROGRAM,
-								glslVersion, glslBinding);
+							passData.geometryCode = crossCompile(passData.code, GPT_GEOMETRY_PROGRAM, language, binding);
 							break;
 						case GPT_HULL_PROGRAM:
-							glslPassData.hullCode = HLSLtoGLSL(glslPassData.code, GPT_HULL_PROGRAM,
-								glslVersion, glslBinding);
+							passData.hullCode = crossCompile(passData.code, GPT_HULL_PROGRAM, language, binding);
 							break;
 						case GPT_DOMAIN_PROGRAM:
-							glslPassData.domainCode = HLSLtoGLSL(glslPassData.code, GPT_DOMAIN_PROGRAM,
-								glslVersion, glslBinding);
+							passData.domainCode = crossCompile(passData.code, GPT_DOMAIN_PROGRAM, language, binding);
 							break;
 						case GPT_COMPUTE_PROGRAM:
-							glslPassData.computeCode = HLSLtoGLSL(glslPassData.code, GPT_COMPUTE_PROGRAM,
-								glslVersion, glslBinding);
+							passData.computeCode = crossCompile(passData.code, GPT_COMPUTE_PROGRAM, language, binding);
 							break;
 						default:
 							break;
 						}
 					}
-				}
+				};
+
+				if(languages.isSet(ShadingLanguageFlag::GLSL))
+					crossCompilePass(glslShaderData.passes[j], glslVersion);
 
 				if(languages.isSet(ShadingLanguageFlag::VKSL))
-				{
-					PassData& vkslPassData = vkslShaderData.passes[j];
-					UINT32 vkslBinding = 0;
+					crossCompilePass(vkslShaderData.passes[j], CrossCompileOutput::VKSL45);
 
-					for (auto& type : types)
-					{
-						switch (type)
-						{
-						case GPT_VERTEX_PROGRAM:
-							vkslPassData.vertexCode = HLSLtoGLSL(vkslPassData.code, GPT_VERTEX_PROGRAM,
-								CrossCompileOutput::VKSL45, vkslBinding);
-							break;
-						case GPT_FRAGMENT_PROGRAM:
-							vkslPassData.fragmentCode = HLSLtoGLSL(vkslPassData.code, GPT_FRAGMENT_PROGRAM,
-								CrossCompileOutput::VKSL45, vkslBinding);
-							break;
-						case GPT_GEOMETRY_PROGRAM:
-							vkslPassData.geometryCode = HLSLtoGLSL(vkslPassData.code, GPT_GEOMETRY_PROGRAM,
-								CrossCompileOutput::VKSL45, vkslBinding);
-							break;
-						case GPT_HULL_PROGRAM:
-							vkslPassData.hullCode = HLSLtoGLSL(vkslPassData.code, GPT_HULL_PROGRAM,
-								CrossCompileOutput::VKSL45, vkslBinding);
-							break;
-						case GPT_DOMAIN_PROGRAM:
-							vkslPassData.domainCode = HLSLtoGLSL(vkslPassData.code, GPT_DOMAIN_PROGRAM,
-								CrossCompileOutput::VKSL45, vkslBinding);
-							break;
-						case GPT_COMPUTE_PROGRAM:
-							vkslPassData.computeCode = HLSLtoGLSL(vkslPassData.code, GPT_COMPUTE_PROGRAM,
-								CrossCompileOutput::VKSL45, vkslBinding);
-							break;
-						default:
-							break;
-						}
-					}
-				}
+				if(languages.isSet(ShadingLanguageFlag::MSL))
+					crossCompilePass(mvksl.passes[j], CrossCompileOutput::MVKSL);
 
 				if(languages.isSet(ShadingLanguageFlag::HLSL))
 				{
@@ -2247,6 +2360,7 @@ namespace bs
 			outputShaderData.push_back(std::make_pair(nullptr, hlslShaderData));
 			outputShaderData.push_back(std::make_pair(nullptr, glslShaderData));
 			outputShaderData.push_back(std::make_pair(nullptr, vkslShaderData));
+			outputShaderData.push_back(std::make_pair(nullptr, mvksl));
 		}
 
 		for(auto& entry : outputShaderData)

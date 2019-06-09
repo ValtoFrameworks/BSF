@@ -16,7 +16,7 @@ namespace bs { namespace ct
 	{
 	public:
 		VulkanRenderAPI();
-		~VulkanRenderAPI();
+		~VulkanRenderAPI() = default;
 
 		/** @copydoc RenderAPI::getName */
 		const StringID& getName() const override;
@@ -95,9 +95,6 @@ namespace bs { namespace ct
 		/** @copydoc RenderAPI::convertProjectionMatrix */
 		void convertProjectionMatrix(const Matrix4& matrix, Matrix4& dest) override;
 
-		/** @copydoc RenderAPI::getAPIInfo */
-		const RenderAPIInfo& getAPIInfo() const override;
-
 		/** @copydoc RenderAPI::generateParamBlockDesc() */
 		GpuParamBlockDesc generateParamBlockDesc(const String& name, Vector<GpuParamDataDesc>& params) override;
 
@@ -147,7 +144,7 @@ namespace bs { namespace ct
 		VulkanCommandBuffer* getCB(const SPtr<CommandBuffer>& buffer);
 
 	private:
-		VkInstance mInstance;
+		VkInstance mInstance = nullptr;
 
 		Vector<SPtr<VulkanDevice>> mDevices;
 		Vector<SPtr<VulkanDevice>> mPrimaryDevices;

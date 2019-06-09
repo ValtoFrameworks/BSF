@@ -81,6 +81,7 @@ set(BS_UTILITY_INC_UTILITY
 	"bsfUtility/Utility/BsAny.h"
 	"bsfUtility/Utility/BsBitfield.h"
 	"bsfUtility/Utility/BsBitwise.h"
+	"bsfUtility/Utility/BsBitstream.h"
 	"bsfUtility/Utility/BsDynLib.h"
 	"bsfUtility/Utility/BsDynLibManager.h"
 	"bsfUtility/Utility/BsEvent.h"
@@ -103,6 +104,8 @@ set(BS_UTILITY_INC_UTILITY
 	"bsfUtility/Utility/BsSmallVector.h"
 	"bsfUtility/Utility/BsDynArray.h"
 	"bsfUtility/Utility/BsMinHeap.h"
+	"bsfUtility/Utility/BsDenseMap.h"
+	"bsfUtility/Utility/BsUSPtr.h"
 )
 
 set(BS_UTILITY_SRC_ALLOCATORS
@@ -196,6 +199,7 @@ set(BS_UTILITY_SRC_SERIALIZATION
 	"bsfUtility/Serialization/BsBinaryDiff.cpp"
 	"bsfUtility/Serialization/BsSerializedObject.cpp"
 	"bsfUtility/Serialization/BsBinaryCloner.cpp"
+	"bsfUtility/Serialization/BsBinaryCompare.cpp"
 )
 
 set(BS_UTILITY_INC_MATH
@@ -241,6 +245,7 @@ set(BS_UTILITY_INC_SERIALIZATION
 	"bsfUtility/Serialization/BsBinaryDiff.h"
 	"bsfUtility/Serialization/BsSerializedObject.h"
 	"bsfUtility/Serialization/BsBinaryCloner.h"
+	"bsfUtility/Serialization/BsBinaryCompare.h"
 )
 
 set(BS_UTILITY_SRC_STRING

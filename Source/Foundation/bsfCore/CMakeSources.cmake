@@ -54,7 +54,6 @@ set(BS_CORE_INC_PHYSICS
 )
 
 set(BS_CORE_INC_CORETHREAD
-	"bsfCore/CoreThread/BsCoreThreadQueue.h"
 	"bsfCore/CoreThread/BsCoreThread.h"
 	"bsfCore/CoreThread/BsCoreObjectManager.h"
 	"bsfCore/CoreThread/BsCoreObject.h"
@@ -184,7 +183,6 @@ set(BS_CORE_SRC_CORETHREAD
 	"bsfCore/CoreThread/BsCoreObject.cpp"
 	"bsfCore/CoreThread/BsCoreObjectManager.cpp"
 	"bsfCore/CoreThread/BsCoreThread.cpp"
-	"bsfCore/CoreThread/BsCoreThreadQueue.cpp"
 	"bsfCore/CoreThread/BsCoreObjectCore.cpp"
 )
 
@@ -389,6 +387,7 @@ set(BS_CORE_INC_RTTI
 	"bsfCore/Private/RTTI/BsVectorFieldRTTI.h"
 	"bsfCore/Private/RTTI/BsDecalRTTI.h"
 	"bsfCore/Private/RTTI/BsCDecalRTTI.h"
+	"bsfCore/Private/RTTI/BsRenderTargetRTTI.h"
 )
 
 set(BS_CORE_SRC_RENDERER
@@ -615,6 +614,14 @@ set(BS_CORE_SRC_PARTICLES
 	"bsfCore/Particles/BsVectorField.cpp"
 )
 
+set(BS_CORE_INC_NETWORK
+	"bsfCore/Network/BsNetwork.h"
+)
+
+set(BS_CORE_SRC_NETWORK
+	"bsfCore/Network/BsNetwork.cpp"
+)
+
 set(BS_CORE_INC_PLATFORM
 	"bsfCore/Platform/BsPlatform.h"
 	"bsfCore/Platform/BsFolderMonitor.h"
@@ -721,6 +728,10 @@ source_group("Mesh" FILES ${BS_CORE_INC_MESH} ${BS_CORE_SRC_MESH})
 source_group("Particles" FILES ${BS_CORE_INC_PARTICLES} ${BS_CORE_SRC_PARTICLES})
 source_group("" FILES ${BS_CORE_INC_NOFILTER} ${BS_CORE_SRC_NOFILTER})
 
+if(EXPERIMENTAL_ENABLE_NETWORKING)
+	source_group("Network" FILES ${BS_CORE_INC_NETWORK} ${BS_CORE_SRC_NETWORK})
+endif()
+
 if(APPLE)
 	source_group("MacOS" FILES ${BS_CORE_INC_PLATFORM_MACOS} ${BS_CORE_SRC_PLATFORM_MACOS})
 endif()
@@ -773,3 +784,11 @@ set(BS_CORE_SRC
 	${BS_CORE_INC_PARTICLES}
 	${BS_CORE_SRC_PARTICLES}
 )
+
+if(EXPERIMENTAL_ENABLE_NETWORKING)
+	set(BS_CORE_SRC
+		${BS_CORE_SRC}
+		${BS_CORE_INC_NETWORK}
+		${BS_CORE_SRC_NETWORK}
+	)
+endif()

@@ -131,7 +131,7 @@ namespace bs
 		MessageHandler::startUp();
 		ProfilerCPU::startUp();
 		ProfilingManager::startUp();
-		ThreadPool::startUp<TThreadPool<ThreadBansheePolicy>>((numWorkerThreads));
+		ThreadPool::startUp<TThreadPool<ThreadDefaultPolicy>>((numWorkerThreads));
 		TaskScheduler::startUp();
 		TaskScheduler::instance().removeWorker();
 		RenderStats::startUp();
@@ -157,6 +157,8 @@ namespace bs
 
 		loadPlugin(mStartUpDesc.renderer, &mRendererPlugin);
 
+		// Must be initialized before the scene manager, as game scene creation triggers physics scene creation
+		PhysicsManager::startUp(mStartUpDesc.physics, mStartUpDesc.physicsCooking);
 		SceneManager::startUp();
 		RendererManager::instance().setActive(mStartUpDesc.renderer);
 		startUpRenderer();
@@ -165,7 +167,6 @@ namespace bs
 		MeshManager::startUp();
 		Importer::startUp();
 		AudioManager::startUp(mStartUpDesc.audio);
-		PhysicsManager::startUp(mStartUpDesc.physics, isEditor());
 		AnimationManager::startUp();
 		ParticleManager::startUp();
 

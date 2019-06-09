@@ -15,7 +15,7 @@ namespace bs
 	class BS_CORE_EXPORT AudioFactory
 	{
 	public:
-		virtual ~AudioFactory() { }
+		virtual ~AudioFactory() = default;
 
 		/** Initializes the audio system. */
 		virtual void startUp() = 0;
@@ -37,8 +37,8 @@ namespace bs
 		~AudioManager();
 
 	private:
-		DynLib* mPlugin;
-		AudioFactory* mFactory;
+		DynLib* mPlugin = nullptr;
+		AudioFactory* mFactory = nullptr;
 	};
 
 	/** @} */

@@ -7,6 +7,9 @@
 #include "Utility/BsDynArray.h"
 #include "Math/BsComplex.h"
 #include "Utility/BsMinHeap.h"
+#include "Utility/BsQuadtree.h"
+#include "Utility/BsBitstream.h"
+#include "Utility/BsUSPtr.h"
 
 namespace bs
 {
@@ -42,6 +45,39 @@ namespace bs
 	};
 
 	typedef Octree<UINT32, DebugOctreeOptions> DebugOctree;
+
+	struct DebugQuadtreeElem
+	{
+		Rect2 box;
+		mutable QuadtreeElementId quadtreeId;
+	};
+
+	struct DebugQuadtreeData
+	{
+		Vector<DebugQuadtreeElem> elements;
+	};
+
+	struct DebugQuadtreeOptions
+	{
+		enum { LoosePadding = 8 };
+		enum { MinElementsPerNode = 4 };
+		enum { MaxElementsPerNode = 8 };
+		enum { MaxDepth = 6 };
+
+		static simd::Rect2 getBounds(UINT32 elem, void* context)
+		{
+			DebugQuadtreeData* quadtreeData = (DebugQuadtreeData*)context;
+			return simd::Rect2(quadtreeData->elements[elem].box);
+		}
+
+		static void setElementId(UINT32 elem, const QuadtreeElementId& id, void* context)
+		{
+			DebugQuadtreeData* quadtreeData = (DebugQuadtreeData*)context;
+			quadtreeData->elements[elem].quadtreeId = id;
+		}
+	};
+
+	typedef Quadtree<UINT32, DebugQuadtreeOptions> DebugQuadtree;
 	void UtilityTestSuite::startUp()
 	{
 		SPtr<TestSuite> fileSystemTests = create<FileSystemTestSuite>();
@@ -60,6 +96,9 @@ namespace bs
 		BS_ADD_TEST(UtilityTestSuite::testDynArray)
 		BS_ADD_TEST(UtilityTestSuite::testComplex)
 		BS_ADD_TEST(UtilityTestSuite::testMinHeap)
+		BS_ADD_TEST(UtilityTestSuite::testQuadtree)
+		BS_ADD_TEST(UtilityTestSuite::testVarInt)
+		BS_ADD_TEST(UtilityTestSuite::testBitStream)
 	}
 
 	void UtilityTestSuite::testBitfield()
@@ -548,5 +587,261 @@ namespace bs
 
 		m.erase(elements, v);
 		BS_TEST_ASSERT(m.size() == 1);
+	}
+
+	void UtilityTestSuite::testQuadtree() 
+	{
+		DebugQuadtreeData quadtreeData;
+		DebugQuadtree quadtree(Vector2(0, 0), 800.0f, &quadtreeData);
+
+		struct SizeAndCount
+		{
+			float sizeMin;
+			float sizeMax;
+			UINT32 count;
+		};
+
+		SizeAndCount types[]
+		{
+			{ 0.02f, 0.2f, 2000 }, // Very small objects
+			{ 0.2f, 1.0f, 2000 }, // Small objects
+			{ 1.0f, 5.0f, 5000 }, // Medium sized objects
+			{ 5.0f, 30.0f, 4000 }, // Large objects
+			{ 30.0f, 100.0f, 2000 } // Very large objects
+		};
+
+		float placementExtents = 750.0f;
+		for (UINT32 i = 0; i < sizeof(types) / sizeof(types[0]); i++)
+		{
+			for (UINT32 j = 0; j < types[i].count; j++)
+			{
+				Vector2 position(
+					((rand() / (float)RAND_MAX) * 2.0f - 1.0f) * placementExtents,
+					((rand() / (float)RAND_MAX) * 2.0f - 1.0f) * placementExtents
+				);
+
+				Vector2 extents(
+					types[i].sizeMin + ((rand() / (float)RAND_MAX)) * (types[i].sizeMax - types[i].sizeMin) * 0.5f,
+					types[i].sizeMin + ((rand() / (float)RAND_MAX)) * (types[i].sizeMax - types[i].sizeMin) * 0.5f
+				);
+
+				DebugQuadtreeElem elem;
+				elem.box = Rect2(position - extents, extents);
+
+				UINT32 elemIdx = (UINT32)quadtreeData.elements.size();
+				quadtreeData.elements.push_back(elem);
+				quadtree.addElement(elemIdx);
+			}
+		}
+
+		DebugQuadtreeElem manualElems[3];
+		manualElems[0].box = Rect2(Vector2(100.0f, 100.0f), Vector2(110.0f, 115.0f));
+		manualElems[1].box = Rect2(Vector2(200.0f, 100.0f), Vector2(250.0f, 150.0f));
+		manualElems[2].box = Rect2(Vector2(90.0f, 90.0f), Vector2(105.0f, 105.0f));
+
+
+		for (UINT32 i = 0; i < 3; i++)
+		{
+			UINT32 elemIdx = (UINT32)quadtreeData.elements.size();
+			quadtreeData.elements.push_back(manualElems[i]);
+			quadtree.addElement(elemIdx);
+		}
+
+		Rect2 queryBounds = manualElems[0].box;
+		DebugQuadtree::BoxIntersectIterator interIter(quadtree, queryBounds);
+
+		Vector<UINT32> overlapElements;
+		while (interIter.moveNext())
+		{
+			UINT32 element = interIter.getElement();
+			overlapElements.push_back(element);
+
+			// Manually check for intersections
+			assert(quadtreeData.elements[element].box.overlaps(queryBounds));
+		}
+
+		// Ensure that all we have found all possible overlaps by manually testing all elements
+		UINT32 elemIdx = 0;
+		for (auto& entry : quadtreeData.elements)
+		{
+			if (entry.box.overlaps(queryBounds))
+			{
+				auto iterFind = std::find(overlapElements.begin(), overlapElements.end(), elemIdx);
+				assert(iterFind != overlapElements.end());
+			}
+
+			elemIdx++;
+		}
+
+		// Ensure nothing goes wrong during element removal
+		for (auto& entry : quadtreeData.elements)
+			quadtree.removeElement(entry.quadtreeId);
+	}
+
+	void UtilityTestSuite::testVarInt()
+	{
+		UINT32 u0 = 0;
+		UINT32 u1 = 127;
+		UINT32 u2 = 255;
+		UINT32 u3 = 123456;
+
+		INT32 i0 = 0;
+		INT32 i1 = 127;
+		INT32 i2 = -1;
+		INT32 i3 = -123456;
+		INT32 i4 = 123456;
+
+		UINT8 output[50];
+
+		UINT32 writeIdx = Bitwise::encodeVarInt(u0, output);
+		BS_TEST_ASSERT(writeIdx == 1);
+
+		writeIdx += Bitwise::encodeVarInt(u1, output + writeIdx);
+		BS_TEST_ASSERT(writeIdx == 2);
+
+		writeIdx += Bitwise::encodeVarInt(u2, output + writeIdx);
+		BS_TEST_ASSERT(writeIdx == 4);
+
+		writeIdx += Bitwise::encodeVarInt(u3, output + writeIdx);
+
+		writeIdx += Bitwise::encodeVarInt(i0, output + writeIdx);
+		writeIdx += Bitwise::encodeVarInt(i1, output + writeIdx);
+		writeIdx += Bitwise::encodeVarInt(i2, output + writeIdx);
+		writeIdx += Bitwise::encodeVarInt(i3, output + writeIdx);
+		writeIdx += Bitwise::encodeVarInt(i4, output + writeIdx);
+
+		UINT32 readIdx = 0;
+		UINT32 uv;
+		readIdx += Bitwise::decodeVarInt(uv, output + readIdx, writeIdx - readIdx);
+		BS_TEST_ASSERT(uv == u0);
+		BS_TEST_ASSERT(writeIdx > readIdx);
+
+		readIdx += Bitwise::decodeVarInt(uv, output + readIdx, writeIdx - readIdx);
+		BS_TEST_ASSERT(uv == u1);
+		BS_TEST_ASSERT(writeIdx > readIdx);
+
+		readIdx += Bitwise::decodeVarInt(uv, output + readIdx, writeIdx - readIdx);
+		BS_TEST_ASSERT(uv == u2);
+		BS_TEST_ASSERT(writeIdx > readIdx);
+
+		readIdx += Bitwise::decodeVarInt(uv, output + readIdx, writeIdx - readIdx);
+		BS_TEST_ASSERT(uv == u3);
+		BS_TEST_ASSERT(writeIdx > readIdx);
+
+		INT32 iv;
+		readIdx += Bitwise::decodeVarInt(iv, output + readIdx, writeIdx - readIdx);
+		BS_TEST_ASSERT(iv == i0);
+		BS_TEST_ASSERT(writeIdx > readIdx);
+
+		readIdx += Bitwise::decodeVarInt(iv, output + readIdx, writeIdx - readIdx);
+		BS_TEST_ASSERT(iv == i1);
+		BS_TEST_ASSERT(writeIdx > readIdx);
+
+		readIdx += Bitwise::decodeVarInt(iv, output + readIdx, writeIdx - readIdx);
+		BS_TEST_ASSERT(iv == i2);
+		BS_TEST_ASSERT(writeIdx > readIdx);
+
+		readIdx += Bitwise::decodeVarInt(iv, output + readIdx, writeIdx - readIdx);
+		BS_TEST_ASSERT(iv == i3);
+		BS_TEST_ASSERT(writeIdx > readIdx);
+
+		readIdx += Bitwise::decodeVarInt(iv, output + readIdx, writeIdx - readIdx);
+		BS_TEST_ASSERT(iv == i4);
+		BS_TEST_ASSERT(writeIdx == readIdx);
+	}
+
+	void UtilityTestSuite::testBitStream()
+	{
+		uint32_t v0 = 12345;
+		bool v1 = true;
+		uint32_t v2 = 67890;
+		bool v3 = true;
+		bool v4 = false;
+		uint32_t v5 = 987;
+		String v6 = "Some test string";
+		int32_t v7 = -777;
+		uint64_t v8 = 1919191919191919ULL;
+		float v9 = 0.3333f;
+		float v10 = 10.54321f;
+
+		uint64_t v11 = 5555555555ULL;
+
+		Bitstream bs;
+
+		bs.write(v0); // 0  - 32
+		bs.write(v1); // 32 - 33
+		bs.write(v2); // 33 - 65
+		bs.write(v3); // 65 - 66
+		bs.write(v4); // 66 - 67
+
+		bs.writeBits((uint8_t*)&v5, 10); // 67 - 77
+		bs.write(v6); // 77 - 213
+		bs.writeVarInt(v7); // 213 - 229
+		bs.writeVarIntDelta(v7, 0); // 229 - 246
+		bs.writeVarInt(v8); // 246 - 310
+		bs.writeVarIntDelta(v8, v8); // 310 - 311
+		bs.writeNorm(v9); // 311 - 327
+		bs.writeRange(v10, 5.0f, 15.0f); // 327 - 343
+		bs.writeRange(v5, 500U, 1000U); // 343 - 352
+
+		bs.align(); // 352
+		bs.write(v11); // 352 - 416
+
+		BS_TEST_ASSERT(bs.size() == 416);
+
+		uint32_t uv;
+		uint64_t ulv;
+		int32_t iv;
+		bool bv;
+		float fv;
+		String sv;
+
+		bs.seek(0);
+		bs.read(uv);
+		BS_TEST_ASSERT(uv == v0);
+
+		bs.read(bv);
+		BS_TEST_ASSERT(bv == v1);
+
+		bs.read(uv);
+		BS_TEST_ASSERT(uv == v2);
+
+		bs.read(bv);
+		BS_TEST_ASSERT(bv == v3);
+
+		bs.read(bv);
+		BS_TEST_ASSERT(bv == v4);
+
+		uv = 0;
+		bs.readBits((uint8_t*)&uv, 10);
+		BS_TEST_ASSERT(uv == v5);
+
+		bs.read(sv);
+		BS_TEST_ASSERT(sv == v6);
+
+		bs.readVarInt(iv);
+		BS_TEST_ASSERT(iv == v7);
+
+		bs.readVarIntDelta(iv, 0);
+		BS_TEST_ASSERT(iv == v7);
+
+		bs.readVarInt(ulv);
+		BS_TEST_ASSERT(ulv == v8);
+
+		bs.readVarIntDelta(v8, v8);
+		BS_TEST_ASSERT(ulv == v8);
+
+		bs.readNorm(fv);
+		BS_TEST_ASSERT(Math::approxEquals(fv, v9, 0.01f));
+
+		bs.readRange(fv, 5.0f, 15.0f);
+		BS_TEST_ASSERT(Math::approxEquals(fv, v10, 0.01f));
+
+		bs.readRange(uv, 500U, 1000U);
+		BS_TEST_ASSERT(uv == v5);
+
+		bs.align();
+		bs.read(ulv);
+		BS_TEST_ASSERT(ulv == v11);
 	}
 }

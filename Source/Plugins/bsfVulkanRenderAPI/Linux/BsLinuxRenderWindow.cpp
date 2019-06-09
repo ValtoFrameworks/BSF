@@ -130,23 +130,29 @@ namespace bs
 		WINDOW_DESC windowDesc;
 		windowDesc.x = mDesc.left;
 		windowDesc.y = mDesc.top;
-		windowDesc.width = mDesc.videoMode.getWidth();
-		windowDesc.height = mDesc.videoMode.getHeight();
+		windowDesc.width = mDesc.videoMode.width;
+		windowDesc.height = mDesc.videoMode.height;
 		windowDesc.title = mDesc.title;
 		windowDesc.showDecorations = mDesc.showTitleBar;
 		windowDesc.allowResize = mDesc.allowResize;
 		windowDesc.showOnTaskBar = !mDesc.toolWindow;
 		windowDesc.modal = mDesc.modal;
 		windowDesc.visualInfo = *visualInfo;
-		windowDesc.screen = mDesc.videoMode.getOutputIdx();
+		windowDesc.screen = mDesc.videoMode.outputIdx;
 		windowDesc.hidden = mDesc.hideUntilSwap || mDesc.hidden;
 
-		NameValuePairList::const_iterator opt;
-		opt = mDesc.platformSpecific.find("parentWindowHandle");
+		auto opt = mDesc.platformSpecific.find("parentWindowHandle");
 		if (opt != mDesc.platformSpecific.end())
 			windowDesc.parent = (::Window)parseUINT64(opt->second);
 		else
 			windowDesc.parent = 0;
+
+		// TODO: add passing the XDisplay here as well. Right now the default display is assumed
+		opt = mDesc.platformSpecific.find("externalWindowHandle");
+		if (opt != mDesc.platformSpecific.end())
+			windowDesc.external = (::Window)parseUINT64(opt->second);
+		else
+			windowDesc.external = 0;
 
 		mIsChild = windowDesc.parent != 0;
 		props.isFullScreen = mDesc.fullscreen && !mIsChild;
@@ -306,7 +312,7 @@ namespace bs
 		const LinuxVideoModeInfo& videoModeInfo =
 				static_cast<const LinuxVideoModeInfo&>(RenderAPI::instance().getVideoModeInfo());
 
-		UINT32 outputIdx = mode.getOutputIdx();
+		UINT32 outputIdx = mode.outputIdx;
 		if(outputIdx >= videoModeInfo.getNumOutputs())
 		{
 			LOGERR("Invalid output device index.")
@@ -320,7 +326,7 @@ namespace bs
 		RROutput outputID = outputInfo._getOutputID();
 
 		RRMode modeID = 0;
-		if(!mode.isCustom())
+		if(!mode.isCustom)
 		{
 			const LinuxVideoMode& videoMode = static_cast<const LinuxVideoMode&>(mode);
 			modeID = videoMode._getModeID();
@@ -383,12 +389,12 @@ namespace bs
 				else
 					refreshRate = 0.0f;
 
-				if (width == mode.getWidth() && height == mode.getHeight())
+				if (width == mode.width && height == mode.height)
 				{
 					modeID = modeInfo.id;
 					foundMode = true;
 
-					if (Math::approxEquals(refreshRate, mode.getRefreshRate()))
+					if (Math::approxEquals(refreshRate, mode.refreshRate))
 						break;
 				}
 			}
@@ -416,8 +422,8 @@ namespace bs
 
 		props.top = 0;
 		props.left = 0;
-		props.width = mode.getWidth();
-		props.height = mode.getHeight();
+		props.width = mode.width;
+		props.height = mode.height;
 
 		_windowMovedOrResized();
 

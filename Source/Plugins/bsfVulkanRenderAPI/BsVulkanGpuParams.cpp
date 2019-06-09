@@ -20,7 +20,7 @@
 namespace bs { namespace ct
 {
 	VulkanGpuParams::VulkanGpuParams(const SPtr<GpuPipelineParamInfo>& paramInfo, GpuDeviceFlags deviceMask)
-		: GpuParams(paramInfo, deviceMask), mPerDeviceData(), mDeviceMask(deviceMask), mSetsDirty(nullptr)
+		: GpuParams(paramInfo, deviceMask), mPerDeviceData(), mDeviceMask(deviceMask)
 	{
 		
 	}
@@ -150,27 +150,13 @@ namespace bs { namespace ct
 					writeSetInfo.descriptorCount = perSetBindings[k].descriptorCount;
 					writeSetInfo.descriptorType = perSetBindings[k].descriptorType;
 
-					bool isImage = writeSetInfo.descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ||
-						writeSetInfo.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE ||
-						writeSetInfo.descriptorType == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-
-					if (isImage)
+					bool isSampler = writeSetInfo.descriptorType == VK_DESCRIPTOR_TYPE_SAMPLER;
+					if(isSampler)
 					{
-						bool isLoadStore = writeSetInfo.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-
 						VkDescriptorImageInfo& imageInfo = perSetData.writeInfos[k].image;
 						imageInfo.sampler = vkDefaultSampler->getHandle();
-						
-						if(isLoadStore)
-						{
-							imageInfo.imageView = vkTexManager.getDummyImageView(types[k], i);
-							imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-						}
-						else
-						{
-							imageInfo.imageView = vkTexManager.getDummyImageView(types[k], i);
-							imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-						}
+						imageInfo.imageView = VK_NULL_HANDLE;
+						imageInfo.imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
 						writeSetInfo.pImageInfo = &imageInfo;
 						writeSetInfo.pBufferInfo = nullptr;
@@ -178,40 +164,75 @@ namespace bs { namespace ct
 					}
 					else
 					{
-						bool useView = writeSetInfo.descriptorType != VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER && 
-							writeSetInfo.descriptorType != VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+						bool isImage = writeSetInfo.descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ||
+							writeSetInfo.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE ||
+							writeSetInfo.descriptorType == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
 
-						if (!useView)
+						if (isImage)
 						{
-							VkDescriptorBufferInfo& bufferInfo = perSetData.writeInfos[k].buffer;
-							bufferInfo.offset = 0;
-							bufferInfo.range = VK_WHOLE_SIZE;
+							VkDescriptorImageInfo& imageInfo = perSetData.writeInfos[k].image;
 
-							if(writeSetInfo.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
-								bufferInfo.buffer = vkBufManager.getDummyUniformBuffer(i);
+							bool isLoadStore = writeSetInfo.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+							if (isLoadStore)
+							{
+								imageInfo.sampler = VK_NULL_HANDLE;
+								imageInfo.imageView = vkTexManager.getDummyImageView(types[k], i);
+								imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+							}
 							else
-								bufferInfo.buffer = vkBufManager.getDummyStructuredBuffer(i);
+							{
+								bool isCombinedImageSampler = writeSetInfo.descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 
-							writeSetInfo.pBufferInfo = &bufferInfo;
+								if(isCombinedImageSampler)
+									imageInfo.sampler = vkDefaultSampler->getHandle();
+								else
+									imageInfo.sampler = VK_NULL_HANDLE;
+
+								imageInfo.imageView = vkTexManager.getDummyImageView(types[k], i);
+								imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+							}
+
+							writeSetInfo.pImageInfo = &imageInfo;
+							writeSetInfo.pBufferInfo = nullptr;
 							writeSetInfo.pTexelBufferView = nullptr;
 						}
 						else
 						{
-							writeSetInfo.pBufferInfo = nullptr;
+							bool useView = writeSetInfo.descriptorType != VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER &&
+								writeSetInfo.descriptorType != VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 
-							bool isLoadStore = writeSetInfo.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
-							VkBufferView bufferView;
-							if(isLoadStore)
-								bufferView = vkBufManager.getDummyStorageBufferView(i);
+							if (!useView)
+							{
+								VkDescriptorBufferInfo& bufferInfo = perSetData.writeInfos[k].buffer;
+								bufferInfo.offset = 0;
+								bufferInfo.range = VK_WHOLE_SIZE;
+
+								if (writeSetInfo.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
+									bufferInfo.buffer = vkBufManager.getDummyUniformBuffer(i);
+								else
+									bufferInfo.buffer = vkBufManager.getDummyStructuredBuffer(i);
+
+								writeSetInfo.pBufferInfo = &bufferInfo;
+								writeSetInfo.pTexelBufferView = nullptr;
+							}
 							else
-								bufferView = vkBufManager.getDummyReadBufferView(i);
+							{
+								writeSetInfo.pBufferInfo = nullptr;
 
-							perSetData.writeInfos[k].bufferView = bufferView;
-							writeSetInfo.pBufferInfo = nullptr;
-							writeSetInfo.pTexelBufferView = &perSetData.writeInfos[k].bufferView;
+								bool isLoadStore = writeSetInfo.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
+								VkBufferView bufferView;
+								if (isLoadStore)
+									bufferView = vkBufManager.getDummyStorageBufferView(i);
+								else
+									bufferView = vkBufManager.getDummyReadBufferView(i);
+
+								perSetData.writeInfos[k].bufferView = bufferView;
+								writeSetInfo.pBufferInfo = nullptr;
+								writeSetInfo.pTexelBufferView = &perSetData.writeInfos[k].bufferView;
+							}
+
+							writeSetInfo.pImageInfo = nullptr;
 						}
-
-						writeSetInfo.pImageInfo = nullptr;
 					}
 				}
 			}
@@ -564,7 +585,7 @@ namespace bs { namespace ct
 
 			UINT32 bindingIdx = vkParamInfo.getBindingIdx(set, slot);
 			VkDescriptorSetLayoutBinding* perSetBindings = vkParamInfo.getBindings(set);
-			VkPipelineStageFlags stages = perSetBindings[bindingIdx].stageFlags;
+			VkPipelineStageFlags stages = VulkanUtility::shaderToPipelineStage(perSetBindings[bindingIdx].stageFlags);
 
 			// Register with command buffer
 			buffer.registerBuffer(resource, BufferUseFlagBits::Parameter, VulkanAccessFlag::Read, stages);
@@ -603,7 +624,7 @@ namespace bs { namespace ct
 
 			UINT32 bindingIdx = vkParamInfo.getBindingIdx(set, slot);
 			VkDescriptorSetLayoutBinding* perSetBindings = vkParamInfo.getBindings(set);
-			VkPipelineStageFlags stages = perSetBindings[bindingIdx].stageFlags;
+			VkPipelineStageFlags stages = VulkanUtility::shaderToPipelineStage(perSetBindings[bindingIdx].stageFlags);
 
 			buffer.registerBuffer(resource, BufferUseFlagBits::Generic, useFlags, stages);
 
@@ -683,7 +704,7 @@ namespace bs { namespace ct
 
 			UINT32 bindingIdx = vkParamInfo.getBindingIdx(set, slot);
 			VkDescriptorSetLayoutBinding* perSetBindings = vkParamInfo.getBindings(set);
-			VkPipelineStageFlags stages = perSetBindings[bindingIdx].stageFlags;
+			VkPipelineStageFlags stages = VulkanUtility::shaderToPipelineStage(perSetBindings[bindingIdx].stageFlags);
 
 			// Register with command buffer
 			VulkanAccessFlags useFlags = VulkanAccessFlag::Read | VulkanAccessFlag::Write;
@@ -731,7 +752,7 @@ namespace bs { namespace ct
 
 			UINT32 bindingIdx = vkParamInfo.getBindingIdx(set, slot);
 			VkDescriptorSetLayoutBinding* perSetBindings = vkParamInfo.getBindings(set);
-			VkPipelineStageFlags stages = perSetBindings[bindingIdx].stageFlags;
+			VkPipelineStageFlags stages = VulkanUtility::shaderToPipelineStage(perSetBindings[bindingIdx].stageFlags);
 
 			buffer.registerImageShader(resource, range, layout, VulkanAccessFlag::Read, stages);
 

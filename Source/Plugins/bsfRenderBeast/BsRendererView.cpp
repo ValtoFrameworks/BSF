@@ -293,16 +293,28 @@ namespace bs { namespace ct
 	{
 		UINT64 cameraLayers = mProperties.visibleLayers;
 		const ConvexVolume& worldFrustum = mProperties.cullFrustum;
+		const Vector3& worldCameraPosition = mProperties.viewOrigin;
+		float baseCullDistance = mRenderSettings->cullDistance;
 
 		for (UINT32 i = 0; i < (UINT32)cullInfos.size(); i++)
 		{
 			if ((cullInfos[i].layer & cameraLayers) == 0)
 				continue;
 
+			// Do distance culling
+			const Sphere& boundingSphere = cullInfos[i].bounds.getSphere();
+			const Vector3& worldRenderablePosition = boundingSphere.getCenter();
+
+			float distanceToCameraSq = worldCameraPosition.squaredDistance(worldRenderablePosition);
+			float correctedCullDistance = cullInfos[i].cullDistanceFactor * baseCullDistance;
+			float maxDistanceToCamera = correctedCullDistance + boundingSphere.getRadius();
+
+			if (distanceToCameraSq > maxDistanceToCamera * maxDistanceToCamera)
+				continue;
+
 			// Do frustum culling
 			// Note: This is bound to be a bottleneck at some point. When it is ensure that intersect methods use vector
 			// operations, as it is trivial to update them. Also consider spatial partitioning.
-			const Sphere& boundingSphere = cullInfos[i].bounds.getSphere();
 			if (worldFrustum.intersects(boundingSphere))
 			{
 				// More precise with the box
@@ -450,11 +462,10 @@ namespace bs { namespace ct
 		// Are we reorganize it because it needs to fit the "(1.0f / (depth + y)) * x" format used in the shader:
 		// z = 1.0f / (depth + minDepth/(maxDepth - minDepth) - A/((maxDepth - minDepth) * C)) * B/((maxDepth - minDepth) * C)
 
-		RenderAPI& rapi = RenderAPI::instance();
-		const RenderAPIInfo& rapiInfo = rapi.getAPIInfo();
+		const RenderAPICapabilities& caps = gCaps();
 
-		float depthRange = rapiInfo.getMaximumDepthInputValue() - rapiInfo.getMinimumDepthInputValue();
-		float minDepth = rapiInfo.getMinimumDepthInputValue();
+		float depthRange = caps.maxDepth - caps.minDepth;
+		float minDepth = caps.minDepth;
 
 		float a = projMatrix[2][2];
 		float b = projMatrix[2][3];
@@ -514,12 +525,11 @@ namespace bs { namespace ct
 
 	Vector2 RendererView::getNDCZToDeviceZ()
 	{
-		RenderAPI& rapi = RenderAPI::instance();
-		const RenderAPIInfo& rapiInfo = rapi.getAPIInfo();
+		const RenderAPICapabilities& caps = gCaps();
 
 		Vector2 ndcZToDeviceZ;
-		ndcZToDeviceZ.x = 1.0f / (rapiInfo.getMaximumDepthInputValue() - rapiInfo.getMinimumDepthInputValue());
-		ndcZToDeviceZ.y = -rapiInfo.getMinimumDepthInputValue();
+		ndcZToDeviceZ.x = 1.0f / (caps.maxDepth - caps.minDepth);
+		ndcZToDeviceZ.y = -caps.minDepth;
 
 		return ndcZToDeviceZ;
 	}
@@ -618,8 +628,7 @@ namespace bs { namespace ct
 
 	Vector4 RendererView::getNDCToUV() const
 	{
-		RenderAPI& rapi = RenderAPI::instance();
-		const RenderAPIInfo& rapiInfo = rapi.getAPIInfo();
+		const RenderAPICapabilities& caps = gCaps();
 		const Rect2I& viewRect = mProperties.target.viewRect;
 		
 		float halfWidth = viewRect.width * 0.5f;
@@ -631,11 +640,11 @@ namespace bs { namespace ct
 		Vector4 ndcToUV;
 		ndcToUV.x = halfWidth / rtWidth;
 		ndcToUV.y = -halfHeight / rtHeight;
-		ndcToUV.z = viewRect.x / rtWidth + (halfWidth + rapiInfo.getHorizontalTexelOffset()) / rtWidth;
-		ndcToUV.w = viewRect.y / rtHeight + (halfHeight + rapiInfo.getVerticalTexelOffset()) / rtHeight;
+		ndcToUV.z = viewRect.x / rtWidth + (halfWidth + caps.horizontalTexelOffset) / rtWidth;
+		ndcToUV.w = viewRect.y / rtHeight + (halfHeight + caps.verticalTexelOffset) / rtHeight;
 
 		// Either of these flips the Y axis, but if they're both true they cancel out
-		if (rapiInfo.isFlagSet(RenderAPIFeatureFlag::UVYAxisUp) ^ rapiInfo.isFlagSet(RenderAPIFeatureFlag::NDCYAxisDown))
+		if ((caps.conventions.uvYAxis == Conventions::Axis::Up) ^ (caps.conventions.ndcYAxis == Conventions::Axis::Down))
 			ndcToUV.y = -ndcToUV.y;
 
 		return ndcToUV;
@@ -741,7 +750,7 @@ namespace bs { namespace ct
 			mViews[i]->calculateVisibility(sceneInfo.reflProbeWorldBounds, mVisibility.reflProbes);
 		}
 
-		// Organize light and refl. probe visibility infomation in a more GPU friendly manner
+		// Organize light and refl. probe visibility information in a more GPU friendly manner
 
 		// Note: I'm determining light and refl. probe visibility for the entire group. It might be more performance
 		// efficient to do it per view. Additionally I'm using a single GPU buffer to hold their information, which is

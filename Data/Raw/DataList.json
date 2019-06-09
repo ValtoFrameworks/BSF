@@ -1,4 +1,5 @@
 ﻿{
+    "AnimatedSprites": null,
     "Cursors": [
         {
             "Path": "Arrow.psd",
@@ -86,10 +87,6 @@
         {
             "Path": "ReflectionCubemapCommon.bslinc",
             "UUID": "eef92578-b8ed-45d6-8eed-d85697ade3c5"
-        },
-        {
-            "Path": "SpriteImage.bslinc",
-            "UUID": "0114b1da-9899-45ca-8486-a9791482d3c5"
         },
         {
             "Path": "VolumeRenderBase.bslinc",
@@ -206,6 +203,10 @@
         {
             "Path": "MaskInput.bslinc",
             "UUID": "e69b8e15-4301-f0fb-11ad-430140d3a7d6"
+        },
+        {
+            "Path": "ShapingCommon.bslinc",
+            "UUID": "3d40728a-454c-0618-cb8d-454c0d8b9d07"
         }
     ],
     "Shaders": [
@@ -260,14 +261,6 @@
         {
             "Path": "Skybox.bsl",
             "UUID": "b1c191fa-0c24-4987-8d3b-72b17511621d"
-        },
-        {
-            "Path": "SpriteImageAlpha.bsl",
-            "UUID": "4c00537f-9d3e-4cb7-8a30-b4ee9f278006"
-        },
-        {
-            "Path": "SpriteImageNoAlpha.bsl",
-            "UUID": "2db979ff-386a-492e-8f6d-675ed5133e31"
         },
         {
             "Path": "SpriteLine.bsl",
@@ -528,6 +521,10 @@
         {
             "Path": "Decal.bsl",
             "UUID": "8d448d61-463b-84fe-d0a1-463b897090a3"
+        },
+        {
+            "Path": "SpriteImage.bsl",
+            "UUID": "430d9f0c-491b-d499-a994-491bfb3a1907"
         }
     ],
     "Skin": [
@@ -898,5 +895,6 @@
         }
     ],
     "SplashScreen": null,
-    "SpriteIcons": null
+    "SpriteIcons": null,
+    "SpriteIcons3D": null
 }

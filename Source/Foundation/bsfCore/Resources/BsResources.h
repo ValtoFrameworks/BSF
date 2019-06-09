@@ -12,7 +12,7 @@ namespace bs
 	 */
 
 	/** Flags that can be used to control resource loading. */
-	enum class ResourceLoadFlag
+	enum class BS_SCRIPT_EXPORT(m:Resources) ResourceLoadFlag
 	{
 		/** No flags. */
 		None = 0,
@@ -44,28 +44,26 @@ namespace bs
 	 *
 	 * @note	Sim thread only.
 	 */
-	class BS_CORE_EXPORT Resources : public Module<Resources>
+	class BS_CORE_EXPORT BS_SCRIPT_EXPORT(m:Resources,api:bsf) Resources : public Module<Resources>
 	{
 		/** Information about a loaded resource. */
 		struct LoadedResourceData
 		{
-			LoadedResourceData()
-				:numInternalRefs(0)
-			{ }
-
-			LoadedResourceData(const WeakResourceHandle<Resource>& resource)
-				:resource(resource), numInternalRefs(0)
+			LoadedResourceData() = default;
+			LoadedResourceData(const WeakResourceHandle<Resource>& resource, UINT32 size)
+				:resource(resource), size(size)
 			{ }
 
 			WeakResourceHandle<Resource> resource;
-			UINT32 numInternalRefs;
+			UINT32 numInternalRefs = 0;
+			UINT32 size = 0;
 		};
 
 		/** Information about a resource that's currently being loaded. */
 		struct ResourceLoadData
 		{
-			ResourceLoadData(const WeakResourceHandle<Resource>& resource, UINT32 numDependencies)
-				:resData(resource), remainingDependencies(numDependencies)
+			ResourceLoadData(const WeakResourceHandle<Resource>& resource, UINT32 numDependencies, UINT32 size)
+				:resData(resource, size), remainingDependencies(numDependencies)
 			{ }
 
 			LoadedResourceData resData;
@@ -73,6 +71,21 @@ namespace bs
 			UINT32 remainingDependencies;
 			Vector<HResource> dependencies;
 			bool notifyImmediately;
+
+			// Progress reporting
+			UINT32 dependencySize = 0;
+			UINT32 dependencyLoadedAmount = 0;
+			std::atomic<float> progress;
+		};
+
+		/** Information about an issued resource load. */
+		struct LoadInfo
+		{
+			enum State { Loading, Failed, AlreadyInProgress, AlreadyLoaded };
+
+			HResource resource;
+			UINT32 size;
+			State state;
 		};
 
 	public:
@@ -89,7 +102,8 @@ namespace bs
 		 *			
 		 * @see		release(ResourceHandleBase&), unloadAllUnused()
 		 */
-		HResource load(const Path& filePath, ResourceLoadFlags loadFlags = ResourceLoadFlag::Default);
+		BS_SCRIPT_EXPORT()
+		BS_NORREF HResource load(const Path& filePath, ResourceLoadFlags loadFlags = ResourceLoadFlag::Default);
 
 		/** @copydoc load(const Path&, ResourceLoadFlags) */
 		template <class T>
@@ -122,6 +136,7 @@ namespace bs
 		 *			
 		 * @see		load(const Path&, ResourceLoadFlags)
 		 */
+		BS_SCRIPT_EXPORT()
 		HResource loadAsync(const Path& filePath, ResourceLoadFlags loadFlags = ResourceLoadFlag::Default);
 
 		/** @copydoc loadAsync */
@@ -141,6 +156,7 @@ namespace bs
 		 *													
 		 * @see		load(const Path&, bool)
 		 */
+		BS_SCRIPT_EXPORT()
 		HResource loadFromUUID(const UUID& uuid, bool async = false, ResourceLoadFlags loadFlags = ResourceLoadFlag::Default);
 
 		/**
@@ -153,16 +169,22 @@ namespace bs
 		 *			
 		 * @param[in]	resource	Handle of the resource to release.
 		 */
+		BS_SCRIPT_EXPORT()
+		void release(const HResource& resource) { release((ResourceHandleBase&)resource); }
+
+		/** @copydoc release(const HResource&) */
 		void release(ResourceHandleBase& resource);
 
 		/**
 		 * Finds all resources that aren't being referenced outside of the resources system and unloads them.
 		 * 			
-		 * @see		release(ResourceHandleBase&)
+		 * @see		release(const HResource&)
 		 */
+		BS_SCRIPT_EXPORT()
 		void unloadAllUnused();
 
 		/** Forces unload of all resources, whether they are being used or not. */
+		BS_SCRIPT_EXPORT()
 		void unloadAll();
 
 		/**
@@ -184,7 +206,8 @@ namespace bs
 		 * @note
 		 * Thread safe if you guarantee the resource isn't being written to from another thread.
 		 */
-		void save(const HResource& resource, const Path& filePath, bool overwrite, bool compress = false);
+		BS_SCRIPT_EXPORT()
+		void save(BS_NORREF const HResource& resource, const Path& filePath, bool overwrite, bool compress = false);
 
 		/**
 		 * Saves an existing resource to its previous location.
@@ -203,7 +226,8 @@ namespace bs
 		 * @note
 		 * Thread safe if you guarantee the resource isn't being written to from another thread.
 		 */
-		void save(const HResource& resource, bool compress = false);
+		BS_SCRIPT_EXPORT()
+		void save(BS_NORREF const HResource& resource, bool compress = false);
 
 		/**
 		 * Updates an existing resource handle with a new resource. Caller must ensure that new resource type matches the 
@@ -218,6 +242,7 @@ namespace bs
 		 * @param[in]	filePath	Full path to the resource to get dependencies for.
 		 * @return					List of dependencies represented as UUIDs.
 		 */
+		BS_SCRIPT_EXPORT()
 		Vector<UUID> getDependencies(const Path& filePath);
 
 		/**
@@ -228,7 +253,20 @@ namespace bs
 		 *								asynchronously loaded.					
 		 * @return						True if loaded or loading in progress, false otherwise.
 		 */
+		BS_SCRIPT_EXPORT()
 		bool isLoaded(const UUID& uuid, bool checkInProgress = true);
+
+		/**
+		 * Returns the loading progress of a resource that's being asynchronously loaded.
+		 * 
+		 * @param[in]	resource				Resource whose load progress to check.
+		 * @param[in]	includeDependencies		If false the progress will reflect the load progress only for this
+		 *										inidividual resource. If true the progress will reflect load progress
+		 *										of this resource and all of its dependencies.
+		 * @return								Load progress in range [0, 1].
+		 */
+		BS_SCRIPT_EXPORT()
+		float getLoadProgress(const HResource& resource, bool includeDependencies = true);
 
 		/**
 		 *Allows you to set a resource manifest containing UUID <-> file path mapping that is used when resolving 
@@ -239,9 +277,11 @@ namespace bs
 		 * application restart, then you must save the resource manifest before closing the application and restore it 
 		 * upon startup. Otherwise resources will be assigned brand new UUIDs and references will be broken.
 		 */
+		BS_SCRIPT_EXPORT()
 		void registerResourceManifest(const SPtr<ResourceManifest>& manifest);
 
 		/**	Unregisters a resource manifest previously registered with registerResourceManifest(). */
+		BS_SCRIPT_EXPORT()
 		void unregisterResourceManifest(const SPtr<ResourceManifest>& manifest);
 
 		/**
@@ -253,12 +293,15 @@ namespace bs
 		 *
 		 * @see		registerResourceManifest
 		 */
+		BS_SCRIPT_EXPORT()
 		SPtr<ResourceManifest> getResourceManifest(const String& name) const;
 
 		/** Attempts to retrieve file path from the provided UUID. Returns true if successful, false otherwise. */
+		BS_SCRIPT_EXPORT()
 		bool getFilePathFromUUID(const UUID& uuid, Path& filePath) const;
 
 		/** Attempts to retrieve UUID from the provided file path. Returns true if successful, false otherwise. */
+		BS_SCRIPT_EXPORT()
 		bool getUUIDFromFilePath(const Path& path, UUID& uuid) const;
 
 		/**
@@ -268,13 +311,15 @@ namespace bs
 		 * It is undefined from which thread this will get called from. Most definitely not the sim thread if resource was
 		 * being loaded asynchronously.
 		 */
-		Event<void(const HResource&)> onResourceLoaded;
+		BS_SCRIPT_EXPORT()
+		Event<void(BS_NORREF const HResource&)> onResourceLoaded;
 
 		/**
 		 * Called when the resource has been destroyed. Provides UUID of the destroyed resource.
 		 *
 		 * @note	It is undefined from which thread this will get called from.
 		 */
+		BS_SCRIPT_EXPORT()
 		Event<void(const UUID&)> onResourceDestroyed;
 
 		/**
@@ -282,7 +327,8 @@ namespace bs
 		 *
 		 * @note	It is undefined from which thread this will get called from.
 		 */
-		Event<void(const HResource&)> onResourceModified;
+		BS_SCRIPT_EXPORT()
+		Event<void(BS_NORREF const HResource&)> onResourceModified;
 
 	public: // ***** INTERNAL ******
 		/** @name Internal
@@ -321,13 +367,13 @@ namespace bs
 		 * resource, although you may provide an empty path in which case the resource will be retrieved from memory if its
 		 * currently loaded.
 		 */
-		HResource loadInternal(const UUID& UUID, const Path& filePath, bool synchronous, ResourceLoadFlags loadFlags);
+		LoadInfo loadInternal(const UUID& UUID, const Path& filePath, bool synchronous, ResourceLoadFlags loadFlags);
 
 		/** Performs actually reading and deserializing of the resource file. Called from various worker threads. */
-		SPtr<Resource> loadFromDiskAndDeserialize(const Path& filePath, bool loadWithSaveData);
+		SPtr<Resource> loadFromDiskAndDeserialize(const Path& filePath, bool loadWithSaveData, std::atomic<float>& progress);
 
 		/**	Triggered when individual resource has finished loading. */
-		void loadComplete(HResource& resource);
+		void loadComplete(HResource& resource, bool notifyProgress);
 
 		/**	Callback triggered when the task manager is ready to process the loading task. */
 		void loadCallback(const Path& filePath, HResource& resource, bool loadWithSaveData);

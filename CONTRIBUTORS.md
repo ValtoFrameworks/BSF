@@ -7,15 +7,22 @@ Huge thanks to all the patrons, contributors and donators!
  - @nemerle - Various bugfixes and code improvements.
  - @jonesmz - Various refactors and code modernization. 
  - @cwfitzgerald - Added cotire support and various build system improvements.
- - @paolopaoletto - SmallVector implementation.
-
+ - @paolopaoletto - SmallVector, DynArray, MinHeap implementation, math library improvements, modernizing code.
+ - @guestnone - Logging system improvements.
+ - @Meumeu - Modernizing & clean-up of the build system.
+ - @ataulien - Added distance culling.
+ 
 # Commercial Tier 2 Patron
-- Chance McDonald [Founder]
+- Chance McDonald [Founder] [Inactive]
 
 # Commercial Tier 1 Patrons
 - Nathan Warden [Founder]
  
 # Tier X Patrons
+- Paul Gruenbacher
+- Henri Hyyryläinen
+- Dreyton Brereton
+- Andreas Schüle [Founder]
 - John Lagerquist [Founder]
 - Christian Clavet [Founder]
 - jeaninde [Founder]
@@ -25,21 +32,23 @@ Huge thanks to all the patrons, contributors and donators!
 # Tier 3 Patrons
 
 # Tier 2 Patrons
+- Andre Taulien
 - Andrzej Oraniewicz [Founder]
 - Nemerle [Founder]
-- Andreas Schüle [Founder]
+- Thomas Tang [Founder]
 
 # Tier 1 Patrons
-- Danijel Ribić [Founder]
-- Serar Tok [Founder]
-- Akaoray [Founder]
-- Thomas Tang [Founder]
 - Nekith [Founder]
-- Summer Softleigh [Founder]
-- Vladimir [Founder]
+- Vladimir Zakharov [Founder]
 - Timothy Green
+- Marko Kovačić
+-----------------------------------------
+- Akaoray [Founder] [Inactive]
+- Danijel Ribić [Founder] [Inactive]
+- Summer Softleigh [Founder] [Inactive]
 
-# One-time donators
+# Donators
+- Andre Taulien
 - Žan Strahija [Founder]
 - Michael Jones [Founder]
 - Patrick Meyer [Founder]

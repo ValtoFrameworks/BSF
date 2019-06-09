@@ -14,6 +14,8 @@
 
 namespace bs
 {
+	class SceneInstance;
+
 	/** @addtogroup Scene
 	 *  @{
 	 */
@@ -186,7 +188,7 @@ namespace bs
 		HSceneObject mThisHandle;
 		UUID mPrefabLinkUUID;
 		SPtr<PrefabDiff> mPrefabDiff;
-		UINT32 mPrefabHash;
+		UINT32 mPrefabHash = 0;
 		UINT32 mFlags;
 
 		/************************************************************************/
@@ -305,11 +307,11 @@ namespace bs
 		Transform mLocalTfrm;
 		mutable Transform mWorldTfrm;
 
-		mutable Matrix4 mCachedLocalTfrm;
-		mutable Matrix4 mCachedWorldTfrm;
+		mutable Matrix4 mCachedLocalTfrm = Matrix4::IDENTITY;
+		mutable Matrix4 mCachedWorldTfrm = Matrix4::IDENTITY;
 
-		mutable UINT32 mDirtyFlags;
-		mutable UINT32 mDirtyHash;
+		mutable UINT32 mDirtyFlags = 0xFFFFFFFF;
+		mutable UINT32 mDirtyHash = 0;
 
 		/** 
 		 * Notifies components and child scene object that a transform has been changed.  
@@ -374,6 +376,9 @@ namespace bs
 		/**	Gets the number of all child GameObjects. */
 		UINT32 getNumChildren() const { return (UINT32)mChildren.size(); }
 
+		/** Returns the scene this object is part of. Can be null if scene object hasn't been instantiated. */
+		const SPtr<SceneInstance>& getScene() const;
+
 		/** 
 		 * Searches the scene object hierarchy to find a child scene object using the provided path.
 		 *
@@ -432,17 +437,22 @@ namespace bs
 		/**
 		 * Makes a deep copy of this object.
 		 * 			
-		 * @param[in]	instantiate	If false, the cloned hierarchy will just be a memory copy, but will not be present in the
-		 * 							scene or otherwise active until instantiate() is called.
+		 * @param[in]	instantiate		If false, the cloned hierarchy will just be a memory copy, but will not be present 
+		 *								in the scene or otherwise active until instantiate() is called.
+		 * @param[in]	preserveUUIDs	If false, each cloned game object will be assigned a brand new UUID. Otherwise
+		 *								the UUID of the original game objects will be preserved. Note that two instantiated
+		 *								scene objects should never have the same UUID, so if preserving UUID's make sure
+		 *								the original is destroyed before instantiating.
 		 */
-		HSceneObject clone(bool instantiate = true);
+		HSceneObject clone(bool instantiate = true, bool preserveUUIDs = false);
 
 	private:
+		SPtr<SceneInstance> mParentScene;
 		HSceneObject mParent;
 		Vector<HSceneObject> mChildren;
-		bool mActiveSelf;
-		bool mActiveHierarchy;
-		ObjectMobility mMobility;
+		bool mActiveSelf = true;
+		bool mActiveHierarchy = true;
+		ObjectMobility mMobility = ObjectMobility::Movable;
 
 		/**
 		 * Internal version of setParent() that allows you to set a null parent.
@@ -452,6 +462,9 @@ namespace bs
 		 *									changed (this means the local transform will be modified accordingly).
 		 */
 		void _setParent(const HSceneObject& parent, bool keepWorldTransform = true);
+
+		/** Changes the owning scene of the scene object and all children. */
+		void setScene(const SPtr<SceneInstance>& scene);
 
 		/**
 		 * Adds a child to the child array. This method doesn't check for null or duplicate values.
@@ -602,8 +615,7 @@ namespace bs
 		/**	Returns all components on this object. */
 		const Vector<HComponent>& getComponents() const { return mComponents; }
 
-	private:
-		/**	Creates an empty component with the default constructor. */
+		/**	Creates an empty component with the default constructor. Primarily used for RTTI purposes. */
 		template <typename T>
 		static SPtr<T> createEmptyComponent()
 		{
@@ -611,10 +623,21 @@ namespace bs
 
 			T* rawPtr = new (bs_alloc<T>()) T();
 			SPtr<T> gameObject(rawPtr, &bs_delete<T>, StdAlloc<T>());
-
+			gameObject->mRTTIData = gameObject;
+			
 			return gameObject;
 		}
 
+	public: // ***** INTERNAL ******
+		/** @name Internal
+		 *  @{
+		 */
+
+		/**	Returns a modifyable list of all components on this object. */
+		Vector<HComponent>& _getComponents() { return mComponents; }
+
+		/** @} */
+	private:
 		/**	Adds the component to the internal component array. */
 		void addComponentInternal(const SPtr<Component>& component);
 

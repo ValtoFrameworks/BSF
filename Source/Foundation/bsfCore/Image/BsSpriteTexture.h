@@ -102,6 +102,9 @@ namespace bs
 		 */
 		Rect2 evaluate(float t) const;
 
+		/** Returns the row and column of the current animation frame for time @p t. */
+		void getAnimationFrame(float t, UINT32& row, UINT32& column) const;
+
 		/** 
 		 * Sets properties describing sprite animation. The animation splits the sprite area into a grid of sub-images
 		 * which can be evaluated over time. In order to view the animation you must also enable playback through
@@ -185,6 +188,20 @@ namespace bs
 		BS_SCRIPT_EXPORT(n:Height,pr:getter)
 		UINT32 getHeight() const;
 
+		/**	
+		 * Returns width of a single animation frame sprite texture in pixels. If the texture has no animation this
+		 * is the same as getWidth().
+		 */
+		BS_SCRIPT_EXPORT(n:FrameWidth,pr:getter)
+		UINT32 getFrameWidth() const;
+
+		/**	
+		 * Returns height of a single animation frame sprite texture in pixels. If the texture has no animation this
+		 * is the same as getHeight().
+		 */
+		BS_SCRIPT_EXPORT(n:FrameHeight,pr:getter)
+		UINT32 getFrameHeight() const;
+
 		/**	Retrieves a core implementation of a sprite texture usable only from the core thread. */
 		SPtr<ct::SpriteTexture> getCore() const;
 
@@ -238,7 +255,7 @@ namespace bs
 		/* 								RTTI		                     		*/
 		/************************************************************************/
 
-		/**	Creates a new empty and uninitialized sprite texture. To be used by factory methods. */
+		/**	Creates a new empty and uninitialized sprite texture. */
 		static SPtr<SpriteTexture> createEmpty();
 	public:
 		friend class SpriteTextureRTTI;

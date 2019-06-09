@@ -21,7 +21,8 @@ Data/Raw/*
 !Data/Raw/.reqversion
 !Data/Raw/DataPackageContents.txt
 Documentation/Generated
-Documentation/Manuals/Images
+Documentation/Manuals/docs/Images
+Documentation/Manuals/static
 Documentation/.version
 Documentation/Timestamp.asset
 /Build
@@ -29,3 +30,7 @@ Documentation/Timestamp.asset
 *.opendb
 BsEngineConfig.h
 BsFrameworkConfig.h
+Source/Scripting/bsfSharp/bsfSharpCore.csproj
+Source/Scripting/bsfSharp/MBansheeEngine.csproj
+Source/Scripting/bsfSharp/EngineVersion.cs
+Source/Scripting/bsfSharp/FrameworkVersion.cs
